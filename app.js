@@ -11,6 +11,7 @@ const remoteVideo = document.getElementById('remote-video');
 let peer = null;
 let localStream = null;
 
+// Opens and minimizes the streaming overlay panel smoothly
 toggleBtn.addEventListener('click', () => { 
     overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex'; 
 });
@@ -18,6 +19,7 @@ closeOverlay.addEventListener('click', () => {
     overlay.style.display = 'none'; 
 });
 
+// Requests screen frame broadcast authorization hooks from the desktop browser
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -33,11 +35,15 @@ async function startCapture() {
     }
 }
 
+// HOST CONNECTION LOGIC
 btnHost.addEventListener('click', async () => {
     const success = await startCapture();
     if (!success) return;
     
+    // Generate a secure random matching code number sequence string
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    // Bind to the distributed cloud broker socket using unique game room identification rules
     peer = new Peer(`agames-8ball-${randomCode}`, { debug: 1 });
     
     statusText.innerText = "| Status: Initializing host network...";
@@ -53,14 +59,16 @@ btnHost.addEventListener('click', async () => {
     });
 
     peer.on('error', (err) => {
+        console.error(err);
         statusText.innerText = "| Network Error: Setup failed. Try again.";
         statusText.style.color = "#ef4444";
     });
 
+    // Event monitoring thread: Listen for incoming connections from your matching friend
     peer.on('call', (call) => {
         statusText.innerText = "| Status: Friend Connected! Live Stream Active.";
         statusText.style.color = "#a855f7";
-        call.answer(localStream);
+        call.answer(localStream); // Echo your captured game tab display loop back outwards
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
@@ -74,22 +82,26 @@ btnHost.addEventListener('click', async () => {
     });
 });
 
+// JOIN CONNECTION LOGIC
 btnJoin.addEventListener('click', async () => {
     const code = roomInput.value.trim();
     if (code.length !== 4 || isNaN(code)) {
-        alert("Please enter a valid 4-digit code.");
+        alert("Please enter a valid 4-digit code provided by your friend.");
         return;
     }
 
     const success = await startCapture();
     if (!success) return;
 
+    // Spin up a flexible runtime client peer node 
     peer = new Peer({ debug: 1 });
+
     statusText.innerText = "| Status: Connecting to friend...";
     statusText.style.color = "#eab308";
 
     peer.on('open', () => {
         const targetPeerId = `agames-8ball-${code}`;
+        // Call out into the matching server directory cloud system to hand over your capture feed
         const call = peer.call(targetPeerId, localStream);
         
         call.on('stream', (remoteStream) => {
@@ -106,6 +118,7 @@ btnJoin.addEventListener('click', async () => {
     });
 
     peer.on('error', (err) => {
+        console.error(err);
         statusText.innerText = "| Match Error: Check code or host status.";
         statusText.style.color = "#ef4444";
     });
