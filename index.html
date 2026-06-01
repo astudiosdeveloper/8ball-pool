@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGames Share (LAN Edition)</title>
+<title>AGames Share (LAN Instant Edition)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -23,7 +23,8 @@
     background: #7c3aed; color: white; border: none; padding: 10px;
     border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.1s;
   }
-  button:hover { background: #6d28d9; }
+  button:hover:not(:disabled) { background: #6d28d9; }
+  button:disabled { background: #27272a; color: #71717a; cursor: not-allowed; }
   .video-container { flex: 2; display: flex; flex-direction: column; gap: 10px; }
   video { width: 100%; flex: 1; background: black; border-radius: 8px; object-fit: contain; }
   .status { font-weight: bold; color: #a1a1aa; }
@@ -32,8 +33,8 @@
 <body>
 
 <div class="header">
-  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(School Network Serverless Mode)</span></h2>
-  <div class="status" id="status">Status: Waiting for initialization...</div>
+  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(Instant LAN Bypass)</span></h2>
+  <div class="status" id="status">Status: Waiting for role choice...</div>
 </div>
 
 <div class="grid">
@@ -44,10 +45,10 @@
       <button style="flex:1; background:#27272a;" id="btn-init-join">I am Joining</button>
     </div>
     
-    <h3 style="margin-top:10px;">Step 2: Share Connection Key</h3>
-    <p style="font-size:12px; color:#a1a1aa;">Copy the generated key below and send it to your opponent via shared doc/chat. Paste theirs back here.</p>
+    <h3 style="margin-top:10px;">Step 2: Connection Key</h3>
+    <p style="font-size:12px; color:#a1a1aa;">Copy the text from this box and send it to your friend, or paste theirs here.</p>
     
-    <textarea id="sdp-box" placeholder="Generated keys will appear here... Paste your friend's key here when instructed."></textarea>
+    <textarea id="sdp-box" placeholder="Keys will generate instantly here..."></textarea>
     <button id="btn-action" disabled>Process Key</button>
   </div>
 
@@ -76,13 +77,11 @@ const remoteVideo = document.getElementById('remote-video');
 
 let pc = null;
 let localStream = null;
-let role = null; // 'host' or 'joiner'
+let role = null;
 
-const rtcConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Standard public utility STUN
-};
+// Empty iceServers prevents the browser from trying to ping outside networks, forcing immediate local key generation
+const rtcConfig = { iceServers: [] };
 
-// Start Screen Capture
 async function startCapture() {
   try {
     localStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
@@ -95,7 +94,6 @@ async function startCapture() {
   }
 }
 
-// Prepare WebRTC Peer Connection Instance
 function createPeerConnection() {
   pc = new RTCPeerConnection(rtcConfig);
   
@@ -111,34 +109,37 @@ function createPeerConnection() {
     }
   };
 
-  // ICE Candidates will compile directly into the Local SDP block
+  // Triggers immediate display without waiting for network gathering loops
   pc.onicecandidate = (e) => {
-    if (e.candidate == null) {
-      sdpBox.value = btoa(JSON.stringify(pc.localDescription));
-      statusEl.textContent = "Status: Key Ready! Copy it and send it to your friend.";
-      statusEl.style.color = "#34d399";
-      sdpBox.select();
+    if (!e.candidate) {
+      console.log("ICE gathering finished.");
     }
   };
 }
 
-// Clicked Host
+// HOST CLICK
 btnInitHost.addEventListener('click', async () => {
   if (!await startCapture()) return;
   role = 'host';
   btnInitHost.disabled = true;
   btnInitJoin.disabled = true;
-  btnAction.disabled = false;
-  btnAction.textContent = "Accept Joiner Key";
-  statusEl.textContent = "Status: Generating Host Key...";
-
+  
   createPeerConnection();
   
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
+  
+  // Forces immediate key packing
+  sdpBox.value = btoa(JSON.stringify(pc.localDescription));
+  statusEl.textContent = "Status: Host Key Ready! Copy it and send to your friend.";
+  statusEl.style.color = "#34d399";
+  sdpBox.select();
+  
+  btnAction.disabled = false;
+  btnAction.textContent = "Accept Joiner Key";
 });
 
-// Clicked Joiner
+// JOINER CLICK
 btnInitJoin.addEventListener('click', async () => {
   if (!await startCapture()) return;
   role = 'joiner';
@@ -146,40 +147,42 @@ btnInitJoin.addEventListener('click', async () => {
   btnInitJoin.disabled = true;
   btnAction.disabled = false;
   btnAction.textContent = "Generate Joiner Answer Key";
-  sdpBox.placeholder = "PASTE Host Key Here First, then press the button below...";
-  statusEl.textContent = "Status: Paste Host Key to begin.";
+  sdpBox.placeholder = "PASTE Host Key Here First, then click the button below...";
+  statusEl.textContent = "Status: Paste Host Key to continue.";
 });
 
-// Process Button
+// PROCESS ACTION
 btnAction.addEventListener('click', async () => {
   const inputData = sdpBox.value.trim();
-  if (!inputData) { alert("Please input or paste a connection key first."); return; }
+  if (!inputData) { alert("Please input text data first."); return; }
 
   try {
     const parsedSDP = JSON.parse(atob(inputData));
 
     if (role === 'host') {
-      // Host receives the Answer key back from the Joiner
       await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
-      statusEl.textContent = "Status: Finalizing connection tunnel...";
+      statusEl.textContent = "Status: Connecting streams directly...";
+      statusEl.style.color = "#3b82f6";
     } 
     else if (role === 'joiner') {
       if (!pc) {
-        // Joiner processes Host's Offer key first
         createPeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        statusEl.textContent = "Status: Generating Answer Key...";
-        btnAction.textContent = "Connect Stream";
-      } else {
-        // If joiner already has an answer ready, prompt them to send it
-        alert("Copy the new key in the box and send it back to the Host!");
+        
+        // Instantly display the answer key for the joiner to copy back
+        sdpBox.value = btoa(JSON.stringify(pc.localDescription));
+        statusEl.textContent = "Status: Answer Key Generated! Copy this back to the Host.";
+        statusEl.style.color = "#a855f7";
+        sdpBox.select();
+        btnAction.textContent = "Waiting for Host...";
+        btnAction.disabled = true;
       }
     }
   } catch (err) {
     console.error(err);
-    alert("Invalid connection key data. Please try copying the full text block again.");
+    alert("Key error. Make sure you copied the entire text block cleanly.");
   }
 });
 </script>
