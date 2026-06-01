@@ -129,7 +129,7 @@ html, body{
 #rec-toast{
   position:fixed;
   bottom:82px;
-  right:130px;
+  right:70px;
   z-index:9999999;
   background:rgba(20,8,31,0.95);
   color:#e9d5ff;
@@ -165,7 +165,7 @@ html, body{
   allowfullscreen>
 </iframe>
 
-<button id="record-btn" title="Start background recorder">
+<button id="record-btn" title="Record last 5 seconds">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="5" fill="#ef4444"/>
     <path d="M17 9l4-2v10l-4-2V9z" fill="#a855f7"/>
@@ -188,112 +188,146 @@ html, body{
 
 <script>
 (function () {
+  const BUFFER_MS = 5000; // Switch to 5 second rolling window
+
   let mediaRecorder = null;
-  let activeStream = null;
-  let recordedChunks = [];
+  let headerChunk = null;       // very first chunk — always has the WebM EBML header
+  let timedChunks = [];         // { blob, ts } — rolling window
   let isCapturing = false;
   let toastTimer = null;
 
-  const btn = document.getElementById('record-btn');
-  const toastEl = document.getElementById('rec-toast');
+  const btn   = document.getElementById('record-btn');
+  const toast = document.getElementById('rec-toast');
 
   function showToast(msg, duration) {
     clearTimeout(toastTimer);
-    toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    if (duration) toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+    toast.textContent = msg;
+    toast.classList.add('show');
+    if (duration) {
+      toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+    }
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toast.classList.remove('show');
   }
 
   async function startCapture() {
     try {
-      activeStream = await navigator.mediaDevices.getDisplayMedia({
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30, cursor: 'always' },
         audio: false,
         preferCurrentTab: true
       });
 
-      // Stick safely to WebM formats which work perfectly natively
+      // Best supported mimeType
       const mimeType = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm'
       ].find(m => MediaRecorder.isTypeSupported(m)) || '';
 
-      mediaRecorder = new MediaRecorder(activeStream, { 
-        mimeType: mimeType || undefined, 
-        videoBitsPerSecond: 2500000 
-      });
-      
-      recordedChunks = [];
+      const options = { mimeType: mimeType || undefined };
+      if (mimeType) options.videoBitsPerSecond = 2500000;
+
+      mediaRecorder = new MediaRecorder(displayStream, options);
+      headerChunk = null;
+      timedChunks = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          recordedChunks.push(e.data);
+        if (!e.data || e.data.size === 0) return;
+        const now = Date.now();
+
+        if (!headerChunk) {
+          // First chunk always contains the WebM EBML header — keep it forever
+          headerChunk = e.data;
+        } else {
+          timedChunks.push({ blob: e.data, ts: now });
+          // Drop chunks older than BUFFER_MS (5000ms)
+          const cutoff = now - BUFFER_MS;
+          timedChunks = timedChunks.filter(c => c.ts >= cutoff);
         }
       };
 
-      // When the recorder stops completely, we bundle the file cleanly
-      mediaRecorder.onstop = () => {
-        if (recordedChunks.length === 0) return;
-
-        const mime = recordedChunks[0].type || 'video/webm';
-        const blob = new Blob(recordedChunks, { type: mime });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `agames-clip-${Date.now()}.webm`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
-        showToast('✅ Clip saved cleanly!', 3000);
-        
-        // Loop back and automatically re-fire background capture seamlessly
-        recordedChunks = [];
-        startCapture(); 
+      // User closed the browser share dialog
+      displayStream.getVideoTracks()[0].onended = () => {
+        if (isCapturing) stopAndSave();
       };
 
-      // Let it pool data smoothly without slicing chunks early
-      mediaRecorder.start(); 
+      // Collect a chunk every 200ms
+      mediaRecorder.start(200);
       isCapturing = true;
       btn.classList.add('recording');
-      showToast('🔴 Active Recording! Hit button again to capture & reset.', 4000);
-
-      activeStream.getVideoTracks()[0].onended = () => cleanUp();
+      showToast('🔴 Buffering… click again to save last 5s');
 
     } catch (err) {
       if (err.name !== 'NotAllowedError') {
-        showToast('⚠️ Error: ' + err.message, 3000);
+        showToast('⚠️ Could not start: ' + err.message, 3000);
       }
     }
   }
 
-  function saveAndReset() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      // Stopping the recorder natively triggers clean, uncorrupted video processing
-      mediaRecorder.stop(); 
-    }
-  }
+  function stopAndSave() {
+    if (!mediaRecorder) return;
 
-  function cleanUp() {
-    isCapturing = false;
-    btn.classList.remove('recording');
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
+    mediaRecorder.onstop = () => {
+      isCapturing = false;
+      btn.classList.remove('recording');
+
+      if (!headerChunk || timedChunks.length === 0) {
+        showToast('⚠️ Nothing recorded yet', 2500);
+        mediaRecorder = null;
+        return;
+      }
+
+      // Build the final blob: header + all rolling chunks
+      const parts = [headerChunk, ...timedChunks.map(c => c.blob)];
+      const mimeType = headerChunk.type || 'video/webm';
+      const blob = new Blob(parts, { type: mimeType });
+
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `agames-clip-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
+
+      hideToast();
+      showToast('✅ Clip saved! Open in Chrome or VLC.', 3500);
+      mediaRecorder = null;
+    };
+
+    // Flush any pending data before stopping
+    if (mediaRecorder.state === 'recording') {
+      mediaRecorder.requestData();
     }
-    if (activeStream) {
-      activeStream.getTracks().forEach(t => t.stop());
-    }
-    mediaRecorder = null;
-    activeStream = null;
-    recordedChunks = [];
+    setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.stream?.getTracks().forEach(t => t.stop());
+      }
+    }, 300);
   }
 
   btn.addEventListener('click', () => {
-    if (!isCapturing) startCapture();
-    else saveAndReset();
+    if (!isCapturing) {
+      startCapture();
+    } else {
+      stopAndSave();
+    }
   });
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    btn.title   = 'Screen recording not supported in this browser';
+    btn.style.opacity = '0.4';
+    btn.style.cursor  = 'not-allowed';
+    btn.addEventListener('click', (e) => {
+      e.stopImmediatePropagation();
+      showToast('⚠️ Use Chrome or Edge for recording', 3000);
+    }, true);
+  }
 })();
 </script>
 
