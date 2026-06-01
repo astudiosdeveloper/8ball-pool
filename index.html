@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGames Share (LAN Instant Edition)</title>
+<title>AGames Share (LAN Direct Link)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -33,7 +33,7 @@
 <body>
 
 <div class="header">
-  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(Instant LAN Bypass)</span></h2>
+  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(Direct Link Mode)</span></h2>
   <div class="status" id="status">Status: Waiting for role choice...</div>
 </div>
 
@@ -79,8 +79,14 @@ let pc = null;
 let localStream = null;
 let role = null;
 
-// Empty iceServers prevents the browser from trying to ping outside networks, forcing immediate local key generation
-const rtcConfig = { iceServers: [] };
+// UPDATED: Added public STUN servers so the firewall allows the direct video link packet transfer
+const rtcConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ],
+  iceCandidatePoolSize: 10
+};
 
 async function startCapture() {
   try {
@@ -109,10 +115,18 @@ function createPeerConnection() {
     }
   };
 
-  // Triggers immediate display without waiting for network gathering loops
+  // Triggers key generation once network possibilities are mapped
   pc.onicecandidate = (e) => {
-    if (!e.candidate) {
-      console.log("ICE gathering finished.");
+    if (e.candidate === null) {
+      sdpBox.value = btoa(JSON.stringify(pc.localDescription));
+      if (role === 'host') {
+        statusEl.textContent = "Status: Host Key Ready! Copy it and send to your friend.";
+        statusEl.style.color = "#34d399";
+      } else if (role === 'joiner') {
+        statusEl.textContent = "Status: Answer Key Generated! Copy this back to the Host.";
+        statusEl.style.color = "#a855f7";
+      }
+      sdpBox.select();
     }
   };
 }
@@ -123,17 +137,12 @@ btnInitHost.addEventListener('click', async () => {
   role = 'host';
   btnInitHost.disabled = true;
   btnInitJoin.disabled = true;
+  statusEl.textContent = "Status: Preparing key (takes up to 3 seconds)...";
   
   createPeerConnection();
   
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  
-  // Forces immediate key packing
-  sdpBox.value = btoa(JSON.stringify(pc.localDescription));
-  statusEl.textContent = "Status: Host Key Ready! Copy it and send to your friend.";
-  statusEl.style.color = "#34d399";
-  sdpBox.select();
   
   btnAction.disabled = false;
   btnAction.textContent = "Accept Joiner Key";
@@ -161,21 +170,17 @@ btnAction.addEventListener('click', async () => {
 
     if (role === 'host') {
       await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
-      statusEl.textContent = "Status: Connecting streams directly...";
+      statusEl.textContent = "Status: Linking streams...";
       statusEl.style.color = "#3b82f6";
     } 
     else if (role === 'joiner') {
       if (!pc) {
+        statusEl.textContent = "Status: Processing host path (takes up to 3 seconds)...";
         createPeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         
-        // Instantly display the answer key for the joiner to copy back
-        sdpBox.value = btoa(JSON.stringify(pc.localDescription));
-        statusEl.textContent = "Status: Answer Key Generated! Copy this back to the Host.";
-        statusEl.style.color = "#a855f7";
-        sdpBox.select();
         btnAction.textContent = "Waiting for Host...";
         btnAction.disabled = true;
       }
