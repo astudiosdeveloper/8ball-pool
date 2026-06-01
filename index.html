@@ -3,193 +3,326 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGames Share (LAN Direct Link)</title>
+<title>8 Ball Pool - AGAMES 2026</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: #09090b; color: white;
-    font-family: system-ui, -apple-system, sans-serif;
-    padding: 20px; display: flex; flex-direction: column; gap: 20px; height: 100vh;
-  }
-  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7c3aed; padding-bottom: 10px; }
-  .grid { display: flex; gap: 20px; flex: 1; min-height: 0; }
-  .panel { flex: 1; background: #111113; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-  textarea {
-    flex: 1; background: #1c1c1f; border: 1px solid #3f3f46; color: #a7f3d0;
-    padding: 10px; border-radius: 6px; resize: none; font-family: monospace; font-size: 11px; outline: none;
-  }
-  textarea:focus { border-color: #7c3aed; }
-  button {
-    background: #7c3aed; color: white; border: none; padding: 10px;
-    border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.1s;
-  }
-  button:hover:not(:disabled) { background: #6d28d9; }
-  button:disabled { background: #27272a; color: #71717a; cursor: not-allowed; }
-  .video-container { flex: 2; display: flex; flex-direction: column; gap: 10px; }
-  video { width: 100%; flex: 1; background: black; border-radius: 8px; object-fit: contain; }
-  .status { font-weight: bold; color: #a1a1aa; }
+html, body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:black;
+}
+#game-frame{
+  width:100%;
+  height:100%;
+  border:none;
+}
+#intro{
+  position:fixed;
+  inset:0;
+  background:radial-gradient(circle at center, #14081f 0%, #000 75%);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden;
+  z-index:99999999;
+  animation:fadeOut 1s forwards;
+  animation-delay:2s;
+}
+#intro::before{
+  content:"";
+  position:absolute;
+  width:500px;
+  height:500px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(168,85,247,0.4) 0%, transparent 70%);
+  animation:pulseGlow 2s ease-in-out infinite;
+  filter:blur(40px);
+}
+#intro-text{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%) scale(0.6);
+  color:white;
+  font-family:Arial, sans-serif;
+  font-size:3rem;
+  font-weight:900;
+  letter-spacing:8px;
+  text-transform:uppercase;
+  text-align:center;
+  white-space:nowrap;
+  opacity:0;
+  text-shadow:0 0 10px white, 0 0 25px #a855f7, 0 0 60px #a855f7;
+  animation:cinematicPop 1.4s ease forwards, textPulse 1.8s ease-in-out infinite;
+}
+.particle{
+  position:absolute;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:white;
+  opacity:0.8;
+  animation:floatParticle linear infinite;
+}
+.p1{left:30%;top:100%;animation-duration:5s;}
+.p2{left:40%;top:100%;animation-duration:6s;}
+.p3{left:50%;top:100%;animation-duration:5.5s;}
+.p4{left:60%;top:100%;animation-duration:6.5s;}
+.p5{left:70%;top:100%;animation-duration:5.2s;}
+@keyframes cinematicPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.4);letter-spacing:20px;filter:blur(12px);}
+  60%{opacity:1;transform:translate(-50%,-50%) scale(1.08);letter-spacing:10px;filter:blur(0px);}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1);letter-spacing:8px;}
+}
+@keyframes pulseGlow{
+  0%,100%{transform:scale(1);opacity:0.5;}
+  50%{transform:scale(1.15);opacity:1;}
+}
+@keyframes textPulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1);}
+  50%{transform:translate(-50%,-50%) scale(1.03);}
+}
+@keyframes floatParticle{
+  from{transform:translateY(0px) scale(0);opacity:0;}
+  20%{opacity:1;}
+  to{transform:translateY(-110vh) scale(1.3);opacity:0;}
+}
+@keyframes fadeOut{
+  to{opacity:0;visibility:hidden;}
+}
+#rt-7c332e278c8731a1485a7aeecf5faf4c{
+  z-index:999999 !important;
+}
+
+/* ── RECORD BUTTON ── */
+#record-btn{
+  position:fixed;
+  bottom:20px;
+  right:150px;
+  z-index:9999999;
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  border:none;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#1a1a2e;
+  box-shadow:0 4px 18px rgba(168,85,247,0.5), 0 0 0 2px #a855f7;
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+}
+#record-btn:hover{
+  transform:scale(1.1);
+  box-shadow:0 6px 24px rgba(168,85,247,0.8), 0 0 0 2px #c084fc;
+}
+#record-btn svg{pointer-events:none;}
+#record-btn.recording{
+  box-shadow:0 0 0 2px #ef4444;
+  animation:recordPulse 1s ease-in-out infinite;
+}
+@keyframes recordPulse{
+  0%,100%{box-shadow:0 0 0 2px #ef4444, 0 0 0 0 rgba(239,68,68,0.4);}
+  50%{box-shadow:0 0 0 2px #ef4444, 0 0 12px 4px rgba(239,68,68,0.25);}
+}
+#rec-toast{
+  position:fixed;
+  bottom:82px;
+  right:130px;
+  z-index:9999999;
+  background:rgba(20,8,31,0.95);
+  color:#e9d5ff;
+  font-family:Arial, sans-serif;
+  font-size:13px;
+  padding:8px 14px;
+  border-radius:10px;
+  border:1px solid #a855f7;
+  box-shadow:0 4px 16px rgba(168,85,247,0.3);
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(6px);
+  transition:opacity 0.25s ease, transform 0.25s ease;
+  white-space:nowrap;
+}
+#rec-toast.show{opacity:1;transform:translateY(0);}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(Direct Link Mode)</span></h2>
-  <div class="status" id="status">Status: Waiting for role choice...</div>
+<div id="intro">
+  <div class="particle p1"></div>
+  <div class="particle p2"></div>
+  <div class="particle p3"></div>
+  <div class="particle p4"></div>
+  <div class="particle p5"></div>
+  <div id="intro-text">Product of AGames</div>
 </div>
 
-<div class="grid">
-  <div class="panel" id="setup-panel">
-    <h3>Step 1: Choose Role</h3>
-    <div style="display:flex; gap:10px;">
-      <button style="flex:1;" id="btn-init-host">I am Hosting</button>
-      <button style="flex:1; background:#27272a;" id="btn-init-join">I am Joining</button>
-    </div>
-    
-    <h3 style="margin-top:10px;">Step 2: Connection Key</h3>
-    <p style="font-size:12px; color:#a1a1aa;">Copy the text from this box and send it to your friend, or paste theirs here.</p>
-    
-    <textarea id="sdp-box" placeholder="Keys will generate instantly here..."></textarea>
-    <button id="btn-action" disabled>Process Key</button>
-  </div>
+<iframe
+  id="game-frame"
+  src="https://bloobio-eightballpool.coolmathgames.com/8ballpool"
+  allowfullscreen>
+</iframe>
 
-  <div class="video-container">
-    <div style="display:flex; gap:10px; flex: 1;">
-      <div style="flex:1; position:relative;">
-        <video id="local-video" autoplay playsinline muted></video>
-        <span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:12px;">Your Screen</span>
-      </div>
-      <div style="flex:1; position:relative;">
-        <video id="remote-video" autoplay playsinline></video>
-        <span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:12px;">Opponent Screen</span>
-      </div>
-    </div>
-  </div>
+<button id="record-btn" title="Start background recorder">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="5" fill="#ef4444"/>
+    <path d="M17 9l4-2v10l-4-2V9z" fill="#a855f7"/>
+    <rect x="2" y="7" width="13" height="10" rx="2" fill="#a855f7"/>
+  </svg>
+</button>
+
+<div id="rec-toast"></div>
+
+<div
+  id="rt-7c332e278c8731a1485a7aeecf5faf4c"
+  data-floating="true"
+  data-side="right"
+  data-width="700"
+  data-height="500"
+  data-user-counter="14,23"
+  data-message-counter="0,60">
 </div>
+<script src="https://rumbletalk.com/client/?@rI!_pc1"></script>
 
 <script>
-const statusEl = document.getElementById('status');
-const sdpBox = document.getElementById('sdp-box');
-const btnAction = document.getElementById('btn-action');
-const btnInitHost = document.getElementById('btn-init-host');
-const btnInitJoin = document.getElementById('btn-init-join');
-const localVideo = document.getElementById('local-video');
-const remoteVideo = document.getElementById('remote-video');
+(function () {
+  const BUFFER_MS = 5000; // 5 second rolling clip window
 
-let pc = null;
-let localStream = null;
-let role = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let isCapturing = false;
+  let toastTimer = null;
 
-// UPDATED: Added public STUN servers so the firewall allows the direct video link packet transfer
-const rtcConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ],
-  iceCandidatePoolSize: 10
-};
+  const btn = document.getElementById('record-btn');
+  const toastEl = document.getElementById('rec-toast');
 
-async function startCapture() {
-  try {
-    localStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
-    localVideo.srcObject = localStream;
-    return true;
-  } catch (err) {
-    statusEl.textContent = "Status: Screen permission denied.";
-    statusEl.style.color = "#ef4444";
-    return false;
+  function showToast(msg, duration) {
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (duration) toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
   }
-}
-
-function createPeerConnection() {
-  pc = new RTCPeerConnection(rtcConfig);
   
-  if (localStream) {
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.classList.remove('show');
   }
 
-  pc.ontrack = (event) => {
-    if (event.streams && event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-      statusEl.textContent = "Status: Connected!";
-      statusEl.style.color = "#10b981";
-    }
-  };
+  async function startCapture() {
+    try {
+      // Step 1: Prompt the user to select the game screen/tab
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30, cursor: 'always' },
+        audio: false,
+        preferCurrentTab: true
+      });
 
-  // Triggers key generation once network possibilities are mapped
-  pc.onicecandidate = (e) => {
-    if (e.candidate === null) {
-      sdpBox.value = btoa(JSON.stringify(pc.localDescription));
-      if (role === 'host') {
-        statusEl.textContent = "Status: Host Key Ready! Copy it and send to your friend.";
-        statusEl.style.color = "#34d399";
-      } else if (role === 'joiner') {
-        statusEl.textContent = "Status: Answer Key Generated! Copy this back to the Host.";
-        statusEl.style.color = "#a855f7";
-      }
-      sdpBox.select();
-    }
-  };
-}
+      const mimeType = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ].find(m => MediaRecorder.isTypeSupported(m)) || '';
 
-// HOST CLICK
-btnInitHost.addEventListener('click', async () => {
-  if (!await startCapture()) return;
-  role = 'host';
-  btnInitHost.disabled = true;
-  btnInitJoin.disabled = true;
-  statusEl.textContent = "Status: Preparing key (takes up to 3 seconds)...";
-  
-  createPeerConnection();
-  
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  
-  btnAction.disabled = false;
-  btnAction.textContent = "Accept Joiner Key";
-});
+      const options = { mimeType: mimeType || undefined, videoBitsPerSecond: 2500000 };
+      mediaRecorder = new MediaRecorder(stream, options);
+      recordedChunks = [];
 
-// JOINER CLICK
-btnInitJoin.addEventListener('click', async () => {
-  if (!await startCapture()) return;
-  role = 'joiner';
-  btnInitHost.disabled = true;
-  btnInitJoin.disabled = true;
-  btnAction.disabled = false;
-  btnAction.textContent = "Generate Joiner Answer Key";
-  sdpBox.placeholder = "PASTE Host Key Here First, then click the button below...";
-  statusEl.textContent = "Status: Paste Host Key to continue.";
-});
+      let chunkTimeline = [];
 
-// PROCESS ACTION
-btnAction.addEventListener('click', async () => {
-  const inputData = sdpBox.value.trim();
-  if (!inputData) { alert("Please input text data first."); return; }
-
-  try {
-    const parsedSDP = JSON.parse(atob(inputData));
-
-    if (role === 'host') {
-      await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
-      statusEl.textContent = "Status: Linking streams...";
-      statusEl.style.color = "#3b82f6";
-    } 
-    else if (role === 'joiner') {
-      if (!pc) {
-        statusEl.textContent = "Status: Processing host path (takes up to 3 seconds)...";
-        createPeerConnection();
-        await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+      mediaRecorder.ondataavailable = (e) => {
+        if (!e.data || e.data.size === 0) return;
         
-        btnAction.textContent = "Waiting for Host...";
-        btnAction.disabled = true;
+        const now = Date.now();
+        chunkTimeline.push({ blob: e.data, ts: now });
+
+        // Constantly slide the timeline window to keep only the last 5 seconds
+        const cutoff = now - BUFFER_MS;
+        while (chunkTimeline.length > 0 && chunkTimeline[0].ts < cutoff) {
+          chunkTimeline.shift();
+        }
+        
+        recordedChunks = chunkTimeline.map(item => item.blob);
+      };
+
+      // Handle user breaking/stopping the capture from native browser banners
+      stream.getVideoTracks()[0].onended = () => {
+        cleanUp();
+      };
+
+      // Request data chunks frequently (every 100ms) for high clipping precision
+      mediaRecorder.start(100); 
+      isCapturing = true;
+      btn.classList.add('recording');
+      btn.title = "Click to instantly save last 5s clip";
+      showToast('🔴 Recording! Click button again anytime to save the last 5s.', 4000);
+
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        showToast('⚠️ Error: ' + err.message, 3000);
       }
     }
-  } catch (err) {
-    console.error(err);
-    alert("Key error. Make sure you copied the entire text block cleanly.");
   }
-});
+
+  function saveClip() {
+    if (!mediaRecorder || recordedChunks.length === 0) {
+      showToast('⚠️ Buffering, give it 2 seconds...', 2500);
+      return;
+    }
+
+    // Instantly mirror the active chunk cache to maintain continuous background recording
+    const finalChunks = [...recordedChunks];
+
+    const mime = finalChunks[0].type || 'video/webm';
+    const blob = new Blob(finalChunks, { type: mime });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agames-clip-${Date.now()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    showToast('✅ Instant replay saved successfully!', 3000);
+  }
+
+  function cleanUp() {
+    isCapturing = false;
+    btn.classList.remove('recording');
+    btn.title = "Start background recorder";
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream?.getTracks().forEach(t => t.stop());
+    }
+    mediaRecorder = null;
+    recordedChunks = [];
+  }
+
+  btn.addEventListener('click', () => {
+    // If it's not active yet, initialize the background buffer session
+    if (!isCapturing) {
+      startCapture();
+    } 
+    // If active, every subsequent click extracts the rolling 5-second buffer smoothly
+    else {
+      saveClip();
+    }
+  });
+
+  // Safe checks for incompatible environments
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+    btn.title = 'Screen recording requires Chrome, Edge, or Firefox';
+    btn.addEventListener('click', (e) => {
+      e.stopImmediatePropagation();
+      showToast('⚠️ Browser unsupported for recording', 3000);
+    }, true);
+  }
+})();
 </script>
+
 </body>
 </html>
