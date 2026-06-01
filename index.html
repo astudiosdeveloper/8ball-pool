@@ -165,7 +165,7 @@ html, body{
   allowfullscreen>
 </iframe>
 
-<button id="record-btn" title="Record last 5 seconds">
+<button id="record-btn" title="Record last 10 seconds">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="5" fill="#ef4444"/>
     <path d="M17 9l4-2v10l-4-2V9z" fill="#a855f7"/>
@@ -188,7 +188,7 @@ html, body{
 
 <script>
 (function () {
-  const BUFFER_MS = 5000; // Switch to 5 second rolling window
+  const BUFFER_MS = 5000;
 
   let mediaRecorder = null;
   let headerChunk = null;       // very first chunk — always has the WebM EBML header
@@ -228,6 +228,7 @@ html, body{
       ].find(m => MediaRecorder.isTypeSupported(m)) || '';
 
       const options = { mimeType: mimeType || undefined };
+      // Request keyframes frequently so any 10s slice is decodable
       if (mimeType) options.videoBitsPerSecond = 2500000;
 
       mediaRecorder = new MediaRecorder(displayStream, options);
@@ -243,7 +244,7 @@ html, body{
           headerChunk = e.data;
         } else {
           timedChunks.push({ blob: e.data, ts: now });
-          // Drop chunks older than BUFFER_MS (5000ms)
+          // Drop chunks older than BUFFER_MS
           const cutoff = now - BUFFER_MS;
           timedChunks = timedChunks.filter(c => c.ts >= cutoff);
         }
@@ -254,11 +255,12 @@ html, body{
         if (isCapturing) stopAndSave();
       };
 
-      // Collect a chunk every 200ms
+      // Collect a chunk every 200ms; also request keyframes every 1s
+      // so slices don't depend on frames outside the window
       mediaRecorder.start(200);
       isCapturing = true;
       btn.classList.add('recording');
-      showToast('🔴 Buffering… click again to save last 5s');
+      showToast('🔴 Buffering… click again to save last 10s');
 
     } catch (err) {
       if (err.name !== 'NotAllowedError') {
