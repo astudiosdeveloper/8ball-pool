@@ -188,12 +188,13 @@ html, body{
 
 <script>
 (function () {
-  const BUFFER_MS = 5000; // 5 second rolling clip window
+  const BUFFER_MS = 5000; // 5 seconds buffer window
 
   let mediaRecorder = null;
   let recordedChunks = [];
   let isCapturing = false;
   let toastTimer = null;
+  let headerChunk = null; // Stays safe to prevent corruption
 
   const btn = document.getElementById('record-btn');
   const toastEl = document.getElementById('rec-toast');
@@ -204,15 +205,10 @@ html, body{
     toastEl.classList.add('show');
     if (duration) toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
   }
-  
-  function hideToast() {
-    clearTimeout(toastTimer);
-    toastEl.classList.remove('show');
-  }
 
   async function startCapture() {
     try {
-      // Step 1: Prompt the user to select the game screen/tab
+      // Direct high-quality browser capture setup
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30, cursor: 'always' },
         audio: false,
@@ -227,17 +223,25 @@ html, body{
 
       const options = { mimeType: mimeType || undefined, videoBitsPerSecond: 2500000 };
       mediaRecorder = new MediaRecorder(stream, options);
+      
       recordedChunks = [];
-
+      headerChunk = null;
       let chunkTimeline = [];
 
       mediaRecorder.ondataavailable = (e) => {
         if (!e.data || e.data.size === 0) return;
         
         const now = Date.now();
+        
+        // Grab the initial file blueprint configuration stream slice
+        if (!headerChunk) {
+          headerChunk = e.data;
+          return;
+        }
+
         chunkTimeline.push({ blob: e.data, ts: now });
 
-        // Constantly slide the timeline window to keep only the last 5 seconds
+        // Keep precisely the continuous timeline window updated
         const cutoff = now - BUFFER_MS;
         while (chunkTimeline.length > 0 && chunkTimeline[0].ts < cutoff) {
           chunkTimeline.shift();
@@ -246,17 +250,14 @@ html, body{
         recordedChunks = chunkTimeline.map(item => item.blob);
       };
 
-      // Handle user breaking/stopping the capture from native browser banners
       stream.getVideoTracks()[0].onended = () => {
         cleanUp();
       };
 
-      // Request data chunks frequently (every 100ms) for high clipping precision
       mediaRecorder.start(100); 
       isCapturing = true;
       btn.classList.add('recording');
-      btn.title = "Click to instantly save last 5s clip";
-      showToast('🔴 Recording! Click button again anytime to save the last 5s.', 4000);
+      showToast('🔴 Recording active! Press again to clip.', 4000);
 
     } catch (err) {
       if (err.name !== 'NotAllowedError') {
@@ -266,15 +267,14 @@ html, body{
   }
 
   function saveClip() {
-    if (!mediaRecorder || recordedChunks.length === 0) {
-      showToast('⚠️ Buffering, give it 2 seconds...', 2500);
+    if (!mediaRecorder || !headerChunk || recordedChunks.length === 0) {
+      showToast('⚠️ Still processing buffer setup...', 2500);
       return;
     }
 
-    // Instantly mirror the active chunk cache to maintain continuous background recording
-    const finalChunks = [...recordedChunks];
-
-    const mime = finalChunks[0].type || 'video/webm';
+    // Stitch the golden blueprint header directly to the rolling chunks to avoid corruption
+    const finalChunks = [headerChunk, ...recordedChunks];
+    const mime = headerChunk.type || 'video/webm';
     const blob = new Blob(finalChunks, { type: mime });
     const url = URL.createObjectURL(blob);
     
@@ -285,42 +285,25 @@ html, body{
     a.click();
     document.body.removeChild(a);
     
-    showToast('✅ Instant replay saved successfully!', 3000);
+    showToast('✅ Clip saved! Playable inside browser or VLC.', 3000);
   }
 
   function cleanUp() {
     isCapturing = false;
     btn.classList.remove('recording');
-    btn.title = "Start background recorder";
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
       mediaRecorder.stream?.getTracks().forEach(t => t.stop());
     }
     mediaRecorder = null;
     recordedChunks = [];
+    headerChunk = null;
   }
 
   btn.addEventListener('click', () => {
-    // If it's not active yet, initialize the background buffer session
-    if (!isCapturing) {
-      startCapture();
-    } 
-    // If active, every subsequent click extracts the rolling 5-second buffer smoothly
-    else {
-      saveClip();
-    }
+    if (!isCapturing) startCapture();
+    else saveClip();
   });
-
-  // Safe checks for incompatible environments
-  if (!navigator.mediaDevices?.getDisplayMedia) {
-    btn.style.opacity = '0.4';
-    btn.style.cursor = 'not-allowed';
-    btn.title = 'Screen recording requires Chrome, Edge, or Firefox';
-    btn.addEventListener('click', (e) => {
-      e.stopImmediatePropagation();
-      showToast('⚠️ Browser unsupported for recording', 3000);
-    }, true);
-  }
 })();
 </script>
 
