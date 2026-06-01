@@ -69,7 +69,7 @@
   }
   .action-btn:hover { background: #6d28d9; }
   .action-btn:active { transform: scale(.97); }
-  .action-btn:disabled { background: #3f3f46; color: #71717a; cursor: not-allowed; }
+  .action-btn:disabled { background: #3f3f3f; color: #71717a; cursor: not-allowed; }
 
   #chat-toggle {
     position: relative;
@@ -274,13 +274,15 @@ let dataConn    = null;
 let unreadCount = 0;
 let chatIsOpen  = false;
 
+// Upgraded to multiple resilient public Google STUN structures to establish cross-network mapping
 const ICE = {
   config: {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' }
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' }
     ]
   },
   debug: 1
@@ -322,7 +324,7 @@ function enableChat() {
   sendBtn.disabled      = false;
   chatInput.placeholder = 'Type a message...';
   if (chatEmptyEl && chatEmptyEl.parentNode === chatMessages)
-    chatEmptyEl.textContent = 'Say something! Messages go directly peer-to-peer.';
+    chatMessages.removeChild(chatEmptyEl);
 }
 
 function appendMessage(from, text) {
@@ -377,7 +379,7 @@ chatToggle.addEventListener('click', () => {
 });
 chatClose.addEventListener('click', () => {
   chatIsOpen = false;
-  chatSidebar.classList.remove('open');
+  chatSidebar.classList.remove('remove');
   chatToggle.classList.remove('active');
 });
 sendBtn.addEventListener('click', sendMessage);
@@ -399,6 +401,11 @@ btnHost.addEventListener('click', async () => {
 
   peer = new Peer('agames-share-' + code, ICE);
 
+  peer.on('error', (err) => {
+    console.error('PeerJS Host Error:', err);
+    setStatus(`Error: ${err.type}`, '#f43f5e');
+  });
+
   peer.on('call', (call) => {
     call.answer(localStream);
     call.on('stream', (s) => { remoteVideo.srcObject = s; setOpponentOnline(); });
@@ -407,12 +414,13 @@ btnHost.addEventListener('click', async () => {
   peer.on('connection', (conn) => {
     wireDataConn(conn);
     conn.on('open', () => {
+      // Increased buffer latency time for standard residential internet speeds
       setTimeout(() => {
         if (!remoteVideo.srcObject) {
           const fb = peer.call('agames-share-' + code + '-client', localStream);
           fb.on('stream', (s) => { remoteVideo.srcObject = s; setOpponentOnline(); });
         }
-      }, 600);
+      }, 1000);
     });
   });
 });
@@ -424,15 +432,21 @@ btnJoin.addEventListener('click', async () => {
   if (!await startCapture()) return;
 
   hideJoinControls();
-  setStatus('Status: Connecting and punching through firewall...', '#f59e0b');
+  setStatus('Status: Bypassing firewalls & mapping IPs...', '#f59e0b');
 
   peer = new Peer('agames-share-' + code + '-client', ICE);
+
+  peer.on('error', (err) => {
+    console.error('PeerJS Join Error:', err);
+    setStatus(`Error: ${err.type}`, '#f43f5e');
+  });
 
   peer.on('open', () => {
     const tid = 'agames-share-' + code;
     const dc  = peer.connect(tid);
     wireDataConn(dc);
     dc.on('open', () => {
+      // Adjusted delay time to give cross-network data channels an extra moment to settle
       setTimeout(() => {
         const call = peer.call(tid, localStream);
         call.on('stream', (s) => {
@@ -440,7 +454,7 @@ btnJoin.addEventListener('click', async () => {
           setOpponentOnline();
           setStatus('Status: Connected!', '#10b981');
         });
-      }, 500);
+      }, 1200);
     });
   });
 
