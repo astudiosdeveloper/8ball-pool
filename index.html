@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGames - Pure P2P Screen Share</title>
+<title>AGames - Pure Firewall Bypass Share</title>
 
 <!-- PeerJS WebRTC Connection Library Script -->
 <script src="https://unpkg.com"></script>
@@ -37,41 +37,6 @@ html, body {
   font-size: 15px;
   color: #a1a1aa;
   font-weight: 500;
-}
-
-/* VISUAL BANNER BOX FOR GENERATED CODE */
-#code-box {
-  display: none;
-  background: #2e1065;
-  border: 2px solid #c084fc;
-  color: #f3e8ff;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  box-shadow: 0 0 15px rgba(192, 132, 252, 0.4);
-}
-
-/* GLOWING CONNECTED INDICATOR BADGE */
-#conn-indicator {
-  display: none;
-  background: #064e3b;
-  border: 2px solid #34d399;
-  color: #a7f3d0;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  box-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
-  animation: pulseGlow 2s infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(0.98); }
 }
 
 #room-input {
@@ -138,6 +103,13 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
   border-left: 3px solid #a855f7;
   pointer-events: none;
 }
+
+/* DYNAMIC STATUS BADGE STYLING INSIDE THE VIEW PANEL */
+#opponent-status-badge {
+  border-left: 3px solid #ef4444;
+  color: #f87171;
+  transition: all 0.3s ease;
+}
 </style>
 </head>
 <body>
@@ -145,9 +117,7 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
     <div id="control-menu">
         <div class="menu-group">
             <span style="font-weight: 800; color: #a855f7; letter-spacing: 0.5px; font-size: 18px;">AGAMES SHARE</span>
-            <span id="status-text">Status: Ready to Stream</span>
-            <div id="code-box">ROOM CODE: <span id="generated-code-text">0000</span></div>
-            <div id="conn-indicator">● Live Connected</div>
+            <span id="status-text">Status: Waiting for action...</span>
         </div>
         <div class="menu-group" id="interactive-actions">
             <button id="btn-host">Host Live Screen</button>
@@ -164,7 +134,8 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
         </div>
         <div class="video-wrapper">
             <video id="remote-video" autoplay playsinline></video>
-            <div class="video-label">Connected Friend's Screen</div>
+            <!-- Label tracker changed to explicitly display live dynamic statuses -->
+            <div class="video-label" id="opponent-status-badge">● Opponent Status: Offline</div>
         </div>
     </div>
 
@@ -175,33 +146,39 @@ const btnJoin = document.getElementById('btn-join');
 const statusText = document.getElementById('status-text');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
-const codeBox = document.getElementById('code-box');
-const generatedCodeText = document.getElementById('generated-code-text');
 const orSeparator = document.getElementById('or-separator');
-const connIndicator = document.getElementById('conn-indicator');
+const opponentStatusBadge = document.getElementById('opponent-status-badge');
 
 let peer = null;
 let localStream = null;
 
-const peerConfig = {
+// TURN/STUN Infrastructure configuration to route safely through strict school firewalls
+const networkBypassConfig = {
     config: {
         'iceServers': [
             { 'urls': 'stun:://google.com' },
             { 'urls': 'stun:://google.com' },
-            { 'urls': 'stun:://google.com' }
+            {
+                'urls': 'turn:openrelay.metered.ca:443',
+                'username': 'openrelayproject',
+                'credential': 'openrelayproject'
+            },
+            {
+                'urls': 'turn:openrelay.metered.ca:80',
+                'username': 'openrelayproject',
+                'credential': 'openrelayproject'
+            }
         ]
     },
     debug: 1
 };
 
-function handleRemoteStream(stream) {
-    remoteVideo.srcObject = stream;
-    connIndicator.style.display = "block";
-    statusText.style.display = "none";
-    btnHost.style.display = "none";
-    btnJoin.style.display = "none";
-    roomInput.style.display = "none";
-    orSeparator.style.display = "none";
+// Changes the label styling on the opponent frame to green when connected online
+function setOpponentOnline() {
+    opponentStatusBadge.innerText = "● Opponent Status: Online";
+    opponentStatusBadge.style.borderLeft = "3px solid #34d399";
+    opponentStatusBadge.style.color = "#a7f3d0";
+    opponentStatusBadge.style.background = "rgba(6, 78, 59, 0.85)";
 }
 
 async function startCapture() {
@@ -221,7 +198,7 @@ async function startCapture() {
 
 // HOST LOGIC
 btnHost.addEventListener('click', async () => {
-    statusText.innerText = "Status: Awaiting screen confirmation popup...";
+    statusText.innerText = "Status: Awaiting screen confirmation...";
     statusText.style.color = "#f59e0b";
 
     const success = await startCapture();
@@ -229,30 +206,38 @@ btnHost.addEventListener('click', async () => {
 
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
+    // Clear out input buttons and swap status message to display the access key code explicitly
     btnHost.style.display = "none";
     btnJoin.style.display = "none";
     roomInput.style.display = "none";
     orSeparator.style.display = "none";
-    statusText.style.display = "none";
-    generatedCodeText.innerText = randomCode;
-    codeBox.style.display = "block";
+    
+    statusText.innerText = `YOUR ROOM CODE: ${randomCode} (Give this to your friend)`;
+    statusText.style.color = "#a855f7";
+    statusText.style.fontSize = "16px";
+    statusText.style.fontWeight = "800";
 
-    peer = new Peer(`agames-share-${randomCode}`, peerConfig);
-
-    // Explicitly listen for data track syncs as well as video calls to double-lock the connection state
-    peer.on('connection', (conn) => {
-        conn.on('open', () => {
-            // Once verified online, force check a secondary verification to request the video line if dropped
-            if(!remoteVideo.srcObject) {
-                peer.call(`agames-share-${randomCode}-client`, localStream);
-            }
-        });
-    });
+    peer = new Peer(`agames-share-${randomCode}`, networkBypassConfig);
 
     peer.on('call', (call) => {
         call.answer(localStream); 
         call.on('stream', (remoteStream) => {
-            handleRemoteStream(remoteStream);
+            remoteVideo.srcObject = remoteStream;
+            setOpponentOnline(); // Flashes opponent panel badge to online state
+        });
+    });
+
+    peer.on('connection', (conn) => {
+        conn.on('open', () => {
+            setTimeout(() => {
+                if(!remoteVideo.srcObject) {
+                    const fallbackCall = peer.call(`agames-share-${randomCode}-client`, localStream);
+                    fallbackCall.on('stream', (remoteStream) => {
+                        remoteVideo.srcObject = remoteStream;
+                        setOpponentOnline();
+                    });
+                }
+            }, 600); 
         });
     });
 });
@@ -268,32 +253,41 @@ btnJoin.addEventListener('click', async () => {
     const success = await startCapture();
     if (!success) return;
 
-    // Use a predictable matching client namespace ID string to stabilize routing lanes
+    // Clean out control menu buttons on the join side too
+    btnHost.style.display = "none";
+    btnJoin.style.display = "none";
+    roomInput.style.display = "none";
+    orSeparator.style.display = "none";
+
     const clientNodeId = `agames-share-${code}-client`;
-    peer = new Peer(clientNodeId, peerConfig);
-    statusText.innerText = "Status: Syncing connection channels...";
+    peer = new Peer(clientNodeId, networkBypassConfig);
+    statusText.innerText = "Status: Connecting and punching through school firewall...";
     statusText.style.color = "#f59e0b";
 
     peer.on('open', () => {
         const targetHostId = `agames-share-${code}`;
-        
-        // Open data pipeline first to wake up the host socket node
         const dataConn = peer.connect(targetHostId);
         
         dataConn.on('open', () => {
-            // Instantly transmit the media capture call layer right behind it
-            const call = peer.call(targetHostId, localStream);
-            call.on('stream', (remoteStream) => {
-                handleRemoteStream(remoteStream);
-            });
+            setTimeout(() => {
+                const call = peer.call(targetHostId, localStream);
+                call.on('stream', (remoteStream) => {
+                    remoteVideo.srcObject = remoteStream;
+                    setOpponentOnline(); // Flashes opponent panel badge to online state
+                    statusText.innerText = "Status: Connected!";
+                    statusText.style.color = "#10b981";
+                });
+            }, 500);
         });
     });
 
-    // Intercept callback loops thrown back by the host stream manager threads
     peer.on('call', (incomingCall) => {
         incomingCall.answer(localStream);
         incomingCall.on('stream', (remoteStream) => {
-            handleRemoteStream(remoteStream);
+            remoteVideo.srcObject = remoteStream;
+            setOpponentOnline();
+            statusText.innerText = "Status: Connected!";
+            statusText.style.color = "#10b981";
         });
     });
 });
