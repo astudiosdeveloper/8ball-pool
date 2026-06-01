@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AGames - Pure P2P Screen Share</title>
 
-<!-- PeerJS WebRTC Connection Library -->
+<!-- PeerJS WebRTC Connection Library Script -->
 <script src="https://unpkg.com"></script>
 
 <style>
@@ -130,6 +130,7 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
             <div class="video-label">Connected Friend's Screen</div>
         </div>
     </div>
+
 <script>
 const roomInput = document.getElementById('room-input');
 const btnHost = document.getElementById('btn-host');
@@ -141,7 +142,7 @@ const remoteVideo = document.getElementById('remote-video');
 let peer = null;
 let localStream = null;
 
-// Standard web api browser request window popup tracker rule for screens
+// Prompts browser system screen frame tracking
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -157,41 +158,46 @@ async function startCapture() {
     }
 }
 
-// HOST HANDSHAKE WITH EXPLICIT SHARABLE VISUAL ROOM DISPLAY CODE KEY
+// HOST CONNECTION LOGIC
 btnHost.addEventListener('click', async () => {
-    const success = await startCapture();
-    if (!success) return;
-    
-    // Generate clean 4 digit code room matching token
+    // Generate code IMMEDIATELY in the browser layout before touching the server ports
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Bind current host onto the global peer distribution cloud server index database directory entries
-    peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
-    
-    statusText.innerText = "Initializing connection engine...";
-    statusText.style.color = "#f59e0b";
+    // Clear display menus and output your 4 digit random code
+    btnHost.disabled = true;
+    btnJoin.disabled = true;
+    roomInput.style.display = "none";
+    document.getElementById('or-separator').style.display = "none";
+    statusText.innerText = `YOUR ROOM CODE: ${randomCode} (Give this to your friend)`;
+    statusText.style.color = "#10b981";
 
-    peer.on('open', (id) => {
-        // FIX: Renders your code text visually into the top bar menu strip layout
-        statusText.innerText = `YOUR ROOM CODE: ${randomCode} (Give this to your friend)`;
-        statusText.style.color = "#10b981";
-        btnHost.disabled = true;
-        btnJoin.disabled = true;
-        roomInput.style.display = "none";
-        document.getElementById('or-separator').style.display = "none";
-    });
+    // Request screen share after displaying code layout
+    const success = await startCapture();
+    if (!success) {
+        // Reset display buttons if screen capture failed
+        btnHost.disabled = false;
+        btnJoin.disabled = false;
+        roomInput.style.display = "inline-block";
+        document.getElementById('or-separator').style.display = "inline";
+        statusText.innerText = "Status: Offline";
+        statusText.style.color = "#a1a1aa";
+        return;
+    }
+    
+    // Connect backend peer connection stream nodes onto matching namespaces
+    peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "Network collision or server drop error.";
-        statusText.style.color = "#f43f5e";
+        statusText.innerText = "Network Delay Notice: Re-attempting signaling channel lock...";
+        statusText.style.color = "#f59e0b";
     });
 
-    // Wait and listen for incoming connection pipelines triggered by the join player box inputs
+    // Wait and accept incoming stream handshakes from join box actions
     peer.on('call', (call) => {
         statusText.innerText = "Friend Connected! Sharing live video frames.";
         statusText.style.color = "#a855f7";
-        call.answer(localStream); // Send host video tracking feed link layout structure back over mesh loop
+        call.answer(localStream); 
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
@@ -205,7 +211,7 @@ btnHost.addEventListener('click', async () => {
     });
 });
 
-// CLIENT JOIN SYSTEM ROUTING LOGIC
+// CLIENT JOIN LOGIC
 btnJoin.addEventListener('click', async () => {
     const code = roomInput.value.trim();
     if (code.length !== 4 || isNaN(code)) {
