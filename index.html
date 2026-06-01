@@ -188,13 +188,11 @@ html, body{
 
 <script>
 (function () {
-  const BUFFER_MS = 5000; // 5 seconds buffer window
-
   let mediaRecorder = null;
+  let activeStream = null;
   let recordedChunks = [];
   let isCapturing = false;
   let toastTimer = null;
-  let headerChunk = null; // Stays safe to prevent corruption
 
   const btn = document.getElementById('record-btn');
   const toastEl = document.getElementById('rec-toast');
@@ -208,56 +206,61 @@ html, body{
 
   async function startCapture() {
     try {
-      // Direct high-quality browser capture setup
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      activeStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30, cursor: 'always' },
         audio: false,
         preferCurrentTab: true
       });
 
+      // Stick safely to WebM formats which work perfectly natively
       const mimeType = [
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm'
       ].find(m => MediaRecorder.isTypeSupported(m)) || '';
 
-      const options = { mimeType: mimeType || undefined, videoBitsPerSecond: 2500000 };
-      mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorder = new MediaRecorder(activeStream, { 
+        mimeType: mimeType || undefined, 
+        videoBitsPerSecond: 2500000 
+      });
       
       recordedChunks = [];
-      headerChunk = null;
-      let chunkTimeline = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (!e.data || e.data.size === 0) return;
-        
-        const now = Date.now();
-        
-        // Grab the initial file blueprint configuration stream slice
-        if (!headerChunk) {
-          headerChunk = e.data;
-          return;
+        if (e.data && e.data.size > 0) {
+          recordedChunks.push(e.data);
         }
-
-        chunkTimeline.push({ blob: e.data, ts: now });
-
-        // Keep precisely the continuous timeline window updated
-        const cutoff = now - BUFFER_MS;
-        while (chunkTimeline.length > 0 && chunkTimeline[0].ts < cutoff) {
-          chunkTimeline.shift();
-        }
-        
-        recordedChunks = chunkTimeline.map(item => item.blob);
       };
 
-      stream.getVideoTracks()[0].onended = () => {
-        cleanUp();
+      // When the recorder stops completely, we bundle the file cleanly
+      mediaRecorder.onstop = () => {
+        if (recordedChunks.length === 0) return;
+
+        const mime = recordedChunks[0].type || 'video/webm';
+        const blob = new Blob(recordedChunks, { type: mime });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `agames-clip-${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        showToast('✅ Clip saved cleanly!', 3000);
+        
+        // Loop back and automatically re-fire background capture seamlessly
+        recordedChunks = [];
+        startCapture(); 
       };
 
-      mediaRecorder.start(100); 
+      // Let it pool data smoothly without slicing chunks early
+      mediaRecorder.start(); 
       isCapturing = true;
       btn.classList.add('recording');
-      showToast('🔴 Recording active! Press again to clip.', 4000);
+      showToast('🔴 Active Recording! Hit button again to capture & reset.', 4000);
+
+      activeStream.getVideoTracks()[0].onended = () => cleanUp();
 
     } catch (err) {
       if (err.name !== 'NotAllowedError') {
@@ -266,26 +269,11 @@ html, body{
     }
   }
 
-  function saveClip() {
-    if (!mediaRecorder || !headerChunk || recordedChunks.length === 0) {
-      showToast('⚠️ Still processing buffer setup...', 2500);
-      return;
+  function saveAndReset() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      // Stopping the recorder natively triggers clean, uncorrupted video processing
+      mediaRecorder.stop(); 
     }
-
-    // Stitch the golden blueprint header directly to the rolling chunks to avoid corruption
-    const finalChunks = [headerChunk, ...recordedChunks];
-    const mime = headerChunk.type || 'video/webm';
-    const blob = new Blob(finalChunks, { type: mime });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `agames-clip-${Date.now()}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    showToast('✅ Clip saved! Playable inside browser or VLC.', 3000);
   }
 
   function cleanUp() {
@@ -293,16 +281,18 @@ html, body{
     btn.classList.remove('recording');
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
-      mediaRecorder.stream?.getTracks().forEach(t => t.stop());
+    }
+    if (activeStream) {
+      activeStream.getTracks().forEach(t => t.stop());
     }
     mediaRecorder = null;
+    activeStream = null;
     recordedChunks = [];
-    headerChunk = null;
   }
 
   btn.addEventListener('click', () => {
     if (!isCapturing) startCapture();
-    else saveClip();
+    else saveAndReset();
   });
 })();
 </script>
