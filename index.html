@@ -274,14 +274,12 @@ let dataConn    = null;
 let unreadCount = 0;
 let chatIsOpen  = false;
 
-// CRITICAL BYPASS: Forced to run exclusively over TCP Port 443 via ?transport=tcp
-// This hides the WebRTC media stream inside standard encrypted HTTPS traffic so school firewalls won't block it.
+// Configured using dedicated Secure TCP parameters to push video data over universal Web Port 443
 const ICE = {
   config: {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
       {
         urls: 'turn:global.metered.ca:443?transport=tcp',
         username: '60ca5cf74571687d03694244',
@@ -294,8 +292,7 @@ const ICE = {
       }
     ],
     sdpSemantics: 'unified-plan'
-  },
-  debug: 1
+  }
 };
 
 function setStatus(text, color) {
@@ -410,7 +407,14 @@ btnHost.addEventListener('click', async () => {
   hideJoinControls();
   showCode(code);
 
-  peer = new Peer('agames-netshare-' + code, ICE);
+  // SCHOOL BYPASS: Forces matchmaking over explicit secure port 443 on public cloud host
+  peer = new Peer('agames-netshare-' + code, {
+    host: 'peerjs.com',
+    port: 443,
+    secure: true,
+    config: ICE.config,
+    debug: 1
+  });
 
   peer.on('error', (err) => {
     console.error('Host error:', err);
@@ -452,7 +456,14 @@ btnJoin.addEventListener('click', async () => {
   hideJoinControls();
   setStatus('Status: Tunneling through firewall over TCP...', '#f59e0b');
 
-  peer = new Peer('agames-netshare-' + code + '-client', ICE);
+  // SCHOOL BYPASS: Forces matchmaking over explicit secure port 443 on public cloud host
+  peer = new Peer('agames-netshare-' + code + '-client', {
+    host: 'peerjs.com',
+    port: 443,
+    secure: true,
+    config: ICE.config,
+    debug: 1
+  });
 
   peer.on('error', (err) => {
     console.error('Join error:', err);
