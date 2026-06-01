@@ -160,7 +160,7 @@ const orSeparator = document.getElementById('or-separator');
 let peer = null;
 let localStream = null;
 
-// Requests permission to capture local display frames
+// Requests permission to capture display panels
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -181,34 +181,35 @@ btnHost.addEventListener('click', async () => {
     statusText.innerText = "Status: Awaiting screen confirmation popup...";
     statusText.style.color = "#f59e0b";
 
-    // 1. Run the screen capture tool FIRST
+    // 1. Prompt screen sharing first
     const success = await startCapture();
-    if (!success) return; // Halt if user drops permission window
+    if (!success) return; 
 
-    // 2. The moment it starts sharing successfully, generate the code
+    // 2. Generate code immediately when streaming works
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Hide standard buttons to clean up menu workspace
+    // UI Cleanup updates
     btnHost.style.display = "none";
     btnJoin.style.display = "none";
     roomInput.style.display = "none";
     orSeparator.style.display = "none";
     statusText.style.display = "none";
 
-    // Show code inside the dedicated purple banner container box
     generatedCodeText.innerText = randomCode;
     codeBox.style.display = "block";
 
-    // 3. Fire up backend server communication pipeline engine
+    // 3. Initialize host cloud connection listeners
     peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
 
     peer.on('error', (err) => {
         console.error(err);
+        alert("P2P Signaling Error. Please try hosting again.");
     });
 
-    // Wait and intercept inbound visual calls from join inputs
+    // FIX: Catch your friend's outbound call stream and display it
     peer.on('call', (call) => {
-        call.answer(localStream); // Send your video capture feed back outwards
+        // Answer by passing back your own stream to make it a two-way exchange
+        call.answer(localStream); 
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
@@ -228,17 +229,22 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
+    // 1. Capture the joining player's display media first
     const success = await startCapture();
     if (!success) return;
 
+    // 2. Setup standard client node configurations
     peer = new Peer({ debug: 1 });
     statusText.innerText = "Status: Connecting to room code...";
     statusText.style.color = "#f59e0b";
 
     peer.on('open', () => {
         const targetPeerId = `agames-share-${code}`;
+        
+        // 3. Transmit your stream over to the target host
         const call = peer.call(targetPeerId, localStream);
         
+        // FIX: Capture and render the incoming stream sent back by the host
         call.on('stream', (remoteStream) => {
             statusText.innerText = "Status: Streams Connected!";
             statusText.style.color = "#10b981";
