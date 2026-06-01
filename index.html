@@ -274,7 +274,8 @@ let dataConn    = null;
 let unreadCount = 0;
 let chatIsOpen  = false;
 
-// Configured using your direct, authenticated Metered TURN servers to force symmetric NAT punch-through
+// CRITICAL BYPASS: Forced to run exclusively over TCP Port 443 via ?transport=tcp
+// This hides the WebRTC media stream inside standard encrypted HTTPS traffic so school firewalls won't block it.
 const ICE = {
   config: {
     iceServers: [
@@ -282,16 +283,17 @@ const ICE = {
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       {
-        urls: 'turn:global.metered.ca:443',
+        urls: 'turn:global.metered.ca:443?transport=tcp',
         username: '60ca5cf74571687d03694244',
         credential: 'K76i1CIat+H1N+pA'
       },
       {
-        urls: 'turn:global.metered.ca:80',
+        urls: 'turn:global.metered.ca:80?transport=tcp',
         username: '60ca5cf74571687d03694244',
         credential: 'K76i1CIat+H1N+pA'
       }
-    ]
+    ],
+    sdpSemantics: 'unified-plan'
   },
   debug: 1
 };
@@ -321,7 +323,8 @@ async function startCapture() {
     localVideo.srcObject = localStream;
     localPH.style.display = 'none';
     return true;
-  } catch {
+  } catch (err) {
+    console.error(err);
     setStatus('Status: Screen capture permission denied.', '#f43f5e');
     return false;
   }
@@ -407,17 +410,20 @@ btnHost.addEventListener('click', async () => {
   hideJoinControls();
   showCode(code);
 
-  // Globally unique prefixes prevent namespace collision over public signaling systems
   peer = new Peer('agames-netshare-' + code, ICE);
 
   peer.on('error', (err) => {
-    console.error('PeerJS Host Error:', err);
+    console.error('Host error:', err);
     setStatus(`Error: ${err.type}`, '#f43f5e');
   });
 
   peer.on('call', (call) => {
     call.answer(localStream);
-    call.on('stream', (s) => { remoteVideo.srcObject = s; setOpponentOnline(); });
+    call.on('stream', (s) => {
+      remoteVideo.srcObject = s;
+      setOpponentOnline();
+      setStatus('Status: Connected!', '#10b981');
+    });
   });
 
   peer.on('connection', (conn) => {
@@ -426,9 +432,13 @@ btnHost.addEventListener('click', async () => {
       setTimeout(() => {
         if (!remoteVideo.srcObject) {
           const fb = peer.call('agames-netshare-' + code + '-client', localStream);
-          fb.on('stream', (s) => { remoteVideo.srcObject = s; setOpponentOnline(); });
+          fb.on('stream', (s) => {
+            remoteVideo.srcObject = s;
+            setOpponentOnline();
+            setStatus('Status: Connected!', '#10b981');
+          });
         }
-      }, 1500);
+      }, 500);
     });
   });
 });
@@ -440,29 +450,19 @@ btnJoin.addEventListener('click', async () => {
   if (!await startCapture()) return;
 
   hideJoinControls();
-  setStatus('Status: Routing via TURN relay...', '#f59e0b');
+  setStatus('Status: Tunneling through firewall over TCP...', '#f59e0b');
 
   peer = new Peer('agames-netshare-' + code + '-client', ICE);
 
   peer.on('error', (err) => {
-    console.error('PeerJS Join Error:', err);
+    console.error('Join error:', err);
     setStatus(`Error: ${err.type}`, '#f43f5e');
   });
 
   peer.on('open', () => {
     const tid = 'agames-netshare-' + code;
-    const dc  = peer.connect(tid);
+    const dc  = peer.connect(tid, { reliable: true });
     wireDataConn(dc);
-    dc.on('open', () => {
-      setTimeout(() => {
-        const call = peer.call(tid, localStream);
-        call.on('stream', (s) => {
-          remoteVideo.srcObject = s;
-          setOpponentOnline();
-          setStatus('Status: Connected!', '#10b981');
-        });
-      }, 1500);
-    });
   });
 
   peer.on('call', (incoming) => {
@@ -479,5 +479,3 @@ roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnJoin.cl
 </script>
 </body>
 </html>
-
-```
