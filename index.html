@@ -3,145 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>8 Ball Pool - AGAMES 2026</title>
+<title>AGames - Pure P2P Screen Share</title>
 
 <!-- PeerJS WebRTC Connection Library -->
 <script src="https://unpkg.com"></script>
 
 <style>
-html, body{
-  margin:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:black;
-  font-family: Arial, sans-serif;
-}
-
-#game-frame{
-  width:100%;
-  height:100%;
-  border:none;
-}
-
-/* CINEMATIC INTRO */
-#intro{
-  position:fixed;
-  inset:0;
-  background: radial-gradient(circle at center, #14081f 0%, #000 75%);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  overflow:hidden;
-  z-index:99999999;
-  animation:fadeOut 1s forwards;
-  animation-delay:2s;
-  pointer-events: none;
-}
-
-#intro::before{
-  content:"";
-  position:absolute;
-  width:500px;
-  height:500px;
-  border-radius:50%;
-  background: radial-gradient(circle, rgba(168,85,247,0.4) 0%, transparent 70%);
-  animation:pulseGlow 2s ease-in-out infinite;
-  filter:blur(40px);
-}
-
-#intro-text{
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%, -50%) scale(0.6);
-  color:white;
-  font-size:3rem;
-  font-weight:900;
-  letter-spacing:8px;
-  text-transform:uppercase;
-  text-align:center;
-  white-space:nowrap;
-  opacity:0;
-  text-shadow: 0 0 10px white, 0 0 25px #a855f7, 0 0 60px #a855f7;
-  animation: cinematicPop 1.4s ease forwards, textPulse 1.8s ease-in-out infinite;
-}
-
-.particle{
-  position:absolute;
-  width:4px;
-  height:4px;
-  border-radius:50%;
-  background:white;
-  opacity:0.8;
-  animation:floatParticle linear infinite;
-}
-.p1{left:30%; top:100%; animation-duration:5s;}
-.p2{left:40%; top:100%; animation-duration:6s;}
-.p3{left:50%; top:100%; animation-duration:5.5s;}
-.p4{left:60%; top:100%; animation-duration:6.5s;}
-.p5{left:70%; top:100%; animation-duration:5.2s;}
-
-@keyframes cinematicPop{
-  0%{ opacity:0; transform:translate(-50%, -50%) scale(0.4); letter-spacing:20px; filter:blur(12px); }
-  60%{ opacity:1; transform:translate(-50%, -50%) scale(1.08); letter-spacing:10px; filter:blur(0px); }
-  100%{ opacity:1; transform:translate(-50%, -50%) scale(1); letter-spacing:8px; }
-}
-@keyframes pulseGlow{
-  0%,100%{ transform:scale(1); opacity:0.5; }
-  50%{ transform:scale(1.15); opacity:1; }
-}
-@keyframes textPulse{
-  0%,100%{ transform:translate(-50%, -50%) scale(1); }
-  50%{ transform:translate(-50%, -50%) scale(1.03); }
-}
-@keyframes floatParticle{
-  from{ transform:translateY(0px) scale(0); opacity:0; }
-  20%{ opacity:1; }
-  to{ transform:translateY(-110vh) scale(1.3); opacity:0; }
-}
-@keyframes fadeOut{
-  to{ opacity:0; visibility:hidden; }
-}
-
-/* RumbleTalk Layer Override */
-#rt-7c332e278c8731a1485a7aeecf5faf4c{
-  z-index:999999 !important;
-}
-
-/* STREAM CONTAINER & INTERFACE */
-#stream-toggle-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 90px;
-  width: 55px;
-  height: 55px;
-  background: #a855f7;
-  border: 2px solid white;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 99999;
-  box-shadow: 0 0 15px rgba(168,85,247,0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: transform 0.2s;
-}
-#stream-toggle-btn:hover { transform: scale(1.1); background: #9333ea; }
-#stream-toggle-btn svg { width: 26px; height: 26px; fill: white; }
-
-#stream-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.95);
-  z-index: 99998;
-  display: none;
-  flex-direction: column;
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #09090b;
+  font-family: system-ui, -apple-system, sans-serif;
   color: white;
 }
-#stream-menu {
-  height: 60px;
-  background: #14081f;
+
+/* TOP DASHBOARD CONTROL MENU */
+#control-menu {
+  height: 70px;
+  background: #18181b;
   border-bottom: 2px solid #a855f7;
   display: flex;
   align-items: center;
@@ -149,127 +30,107 @@ html, body{
   padding: 0 20px;
   box-sizing: border-box;
 }
-.menu-group { display: flex; align-items: center; gap: 10px; }
-#stream-menu input {
-  background: #261438;
+
+.menu-group { display: flex; align-items: center; gap: 15px; }
+
+#status-text {
+  font-size: 14px;
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+#room-input {
+  background: #27272a;
   border: 1px solid #a855f7;
   color: white;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 14px;
-  width: 150px;
+  width: 160px;
   text-align: center;
+  outline: none;
 }
-#stream-menu button {
+
+button {
   background: #a855f7;
   color: white;
   border: none;
-  padding: 7px 15px;
-  border-radius: 4px;
+  padding: 9px 18px;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: bold;
+  font-size: 14px;
+  transition: background 0.2s;
 }
-#stream-menu button:hover { background: #9333ea; }
-#close-overlay { background: #ef4444 !important; }
+button:hover { background: #9333ea; }
+button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
 
+/* 50/50 SPLIT SCREEN VIDEO GRID */
 #video-grid {
-  flex: 1;
   display: flex;
   width: 100%;
-  height: calc(100% - 60px);
-  background: #05020a;
+  height: calc(100% - 70px);
+  background: #09090b;
 }
+
 .video-wrapper {
   flex: 1;
   height: 100%;
   position: relative;
   background: #111;
-  border: 1px solid #222;
+  border: 1px solid #27272a;
   display: flex;
   justify-content: center;
   align-items: center;
 }
-.video-wrapper video { width: 100%; height: 100%; object-fit: contain; background: black; }
+
+.video-wrapper video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: black;
+}
+
 .video-label {
   position: absolute;
   top: 15px;
   left: 15px;
-  background: rgba(0,0,0,0.7);
-  padding: 5px 12px;
-  border-radius: 4px;
+  background: rgba(9, 9, 11, 0.85);
+  padding: 6px 14px;
+  border-radius: 6px;
   font-size: 13px;
+  font-weight: 600;
   border-left: 3px solid #a855f7;
+  pointer-events: none;
 }
 </style>
 </head>
-
 <body>
 
-<!-- INTRO -->
-<div id="intro">
-  <div class="particle p1"></div>
-  <div class="particle p2"></div>
-  <div class="particle p3"></div>
-  <div class="particle p4"></div>
-  <div class="particle p5"></div>
-  <div id="intro-text">Product of AGames</div>
-</div>
-
-<!-- GAME -->
-<iframe
-  id="game-frame"
-  src="https://coolmathgames.com"
-  allowfullscreen>
-</iframe>
-
-<!-- STREAM INTERFACE HUD -->
-<button id="stream-toggle-btn" title="Toggle Streams">
-    <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55 .45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM14 16H5V8h9v8z"/></svg>
-</button>
-
-<div id="stream-overlay">
-    <div id="stream-menu">
+    <div id="control-menu">
         <div class="menu-group">
-            <span style="font-weight: bold; color: #a855f7;">AGAMES STREAM</span>
-            <span id="status-text" style="color: #a3a3a3; font-size:13px;">| Status: Disconnected</span>
+            <span style="font-weight: 800; color: #a855f7; letter-spacing: 0.5px;">AGAMES SHARE</span>
+            <span id="status-text">Status: Offline</span>
         </div>
         <div class="menu-group">
-            <button id="btn-host">Host Game</button>
-            <span style="color:#a3a3a3;" id="or-label">or</span>
-            <input type="text" id="room-input" placeholder="Enter 4-Digit Code" maxlength="4">
-            <button id="btn-join">Join Game</button>
-            <button id="close-overlay">Minimize</button>
+            <button id="btn-host">Host Live Screen</button>
+            <span style="color: #71717a;" id="or-separator">or</span>
+            <input type="text" id="room-input" placeholder="Enter Friend's Code" maxlength="4">
+            <button id="btn-join">Join Stream</button>
         </div>
     </div>
+
     <div id="video-grid">
         <div class="video-wrapper">
             <video id="local-video" autoplay playsinline muted></video>
-            <div class="video-label">Your Screen (You)</div>
+            <div class="video-label">Your Screen Feed</div>
         </div>
         <div class="video-wrapper">
             <video id="remote-video" autoplay playsinline></video>
-            <div class="video-label">Opponent Stream</div>
+            <div class="video-label">Connected Friend's Screen</div>
         </div>
     </div>
-</div>
-
-<!-- RumbleTalk Chat -->
-<div 
-  id="rt-7c332e278c8731a1485a7aeecf5faf4c"
-  data-floating="true"
-  data-side="right"
-  data-width="700"
-  data-height="500"
-  data-user-counter="14,23"
-  data-message-counter="0,60">
-</div>
-
-<script src="https://rumbletalk.com"></script>
-<!-- CONNECTION ENGINE LOGIC SCRIPT -->
 <script>
-const toggleBtn = document.getElementById('stream-toggle-btn');
-const overlay = document.getElementById('stream-overlay');
-const closeOverlay = document.getElementById('close-overlay');
 const roomInput = document.getElementById('room-input');
 const btnHost = document.getElementById('btn-host');
 const btnJoin = document.getElementById('btn-join');
@@ -280,15 +141,7 @@ const remoteVideo = document.getElementById('remote-video');
 let peer = null;
 let localStream = null;
 
-// Opens and minimizes the streaming workspace menu smoothly
-toggleBtn.addEventListener('click', () => { 
-    overlay.style.display = (overlay.style.display === 'flex') ? 'none' : 'flex'; 
-});
-closeOverlay.addEventListener('click', () => { 
-    overlay.style.display = 'none'; 
-});
-
-// Prompts browser screen sharing parameters
+// Standard web api browser request window popup tracker rule for screens
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -298,46 +151,47 @@ async function startCapture() {
         localVideo.srcObject = localStream;
         return true;
     } catch (err) {
-        statusText.innerText = "| Error: Screen capture permission denied.";
-        statusText.style.color = "#ef4444";
+        statusText.innerText = "Error: Permission denied.";
+        statusText.style.color = "#f43f5e";
         return false;
     }
 }
 
-// HOST CONNECTION LOGIC
+// HOST HANDSHAKE WITH EXPLICIT SHARABLE VISUAL ROOM DISPLAY CODE KEY
 btnHost.addEventListener('click', async () => {
     const success = await startCapture();
     if (!success) return;
     
-    // Generate a random 4-digit ID
+    // Generate clean 4 digit code room matching token
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Establish Cloud Server Room handshake via PeerJS using a unique namespace prefix
-    peer = new Peer(`agames-8ball-${randomCode}`, { debug: 1 });
+    // Bind current host onto the global peer distribution cloud server index database directory entries
+    peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
     
-    statusText.innerText = "| Status: Initializing host network...";
-    statusText.style.color = "#eab308";
+    statusText.innerText = "Initializing connection engine...";
+    statusText.style.color = "#f59e0b";
 
     peer.on('open', (id) => {
-        statusText.innerText = `| YOUR CODE: ${randomCode} (Give this to your friend)`;
-        statusText.style.color = "#22c55e";
+        // FIX: Renders your code text visually into the top bar menu strip layout
+        statusText.innerText = `YOUR ROOM CODE: ${randomCode} (Give this to your friend)`;
+        statusText.style.color = "#10b981";
         btnHost.disabled = true;
         btnJoin.disabled = true;
         roomInput.style.display = "none";
-        document.getElementById('or-label').style.display = "none";
+        document.getElementById('or-separator').style.display = "none";
     });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "| Network Error: Setup failed. Try again.";
-        statusText.style.color = "#ef4444";
+        statusText.innerText = "Network collision or server drop error.";
+        statusText.style.color = "#f43f5e";
     });
 
-    // Handle when your friend joins and sends their screen
+    // Wait and listen for incoming connection pipelines triggered by the join player box inputs
     peer.on('call', (call) => {
-        statusText.innerText = "| Status: Friend Connected! Live Stream Active.";
+        statusText.innerText = "Friend Connected! Sharing live video frames.";
         statusText.style.color = "#a855f7";
-        call.answer(localStream); // Send your screen share back to them
+        call.answer(localStream); // Send host video tracking feed link layout structure back over mesh loop
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
@@ -345,51 +199,48 @@ btnHost.addEventListener('click', async () => {
         
         call.on('close', () => {
             remoteVideo.srcObject = null;
-            statusText.innerText = "| Status: Friend disconnected.";
-            statusText.style.color = "#ef4444";
+            statusText.innerText = "Friend left stream session.";
+            statusText.style.color = "#f43f5e";
         });
     });
 });
 
-// JOIN CONNECTION LOGIC
+// CLIENT JOIN SYSTEM ROUTING LOGIC
 btnJoin.addEventListener('click', async () => {
     const code = roomInput.value.trim();
     if (code.length !== 4 || isNaN(code)) {
-        alert("Please enter a valid 4-digit code provided by your friend.");
+        alert("Please enter a valid 4-digit code.");
         return;
     }
 
     const success = await startCapture();
     if (!success) return;
 
-    // Boot a temporary connection runtime node instance for you
     peer = new Peer({ debug: 1 });
-
-    statusText.innerText = "| Status: Connecting to friend...";
-    statusText.style.color = "#eab308";
+    statusText.innerText = "Connecting to friend's game room...";
+    statusText.style.color = "#f59e0b";
 
     peer.on('open', () => {
-        const targetPeerId = `agames-8ball-${code}`;
-        // Transmit out your video capture frame channel to host
+        const targetPeerId = `agames-share-${code}`;
         const call = peer.call(targetPeerId, localStream);
         
         call.on('stream', (remoteStream) => {
-            statusText.innerText = "| Status: Connected! Screen layout synchronized.";
-            statusText.style.color = "#22c55e";
+            statusText.innerText = "Connected successfully! Active synchronization active.";
+            statusText.style.color = "#10b981";
             remoteVideo.srcObject = remoteStream;
         });
 
         call.on('close', () => {
             remoteVideo.srcObject = null;
-            statusText.innerText = "| Status: Disconnected from match.";
-            statusText.style.color = "#ef4444";
+            statusText.innerText = "Disconnected from room.";
+            statusText.style.color = "#f43f5e";
         });
     });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "| Match Error: Check code or host status.";
-        statusText.style.color = "#ef4444";
+        statusText.innerText = "Match failed. Wrong room code or host closed down.";
+        statusText.style.color = "#f43f5e";
     });
 });
 </script>
