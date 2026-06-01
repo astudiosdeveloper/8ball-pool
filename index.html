@@ -183,7 +183,6 @@ const connIndicator = document.getElementById('conn-indicator');
 let peer = null;
 let localStream = null;
 
-// FIXED: Google's global STUN infrastructure configuration block to force network bypasses
 const peerConfig = {
     config: {
         'iceServers': [
@@ -195,7 +194,8 @@ const peerConfig = {
     debug: 1
 };
 
-function setOnlineUI() {
+function handleRemoteStream(stream) {
+    remoteVideo.srcObject = stream;
     connIndicator.style.display = "block";
     statusText.style.display = "none";
     btnHost.style.display = "none";
@@ -237,21 +237,22 @@ btnHost.addEventListener('click', async () => {
     generatedCodeText.innerText = randomCode;
     codeBox.style.display = "block";
 
-    // Initialize host with Google infrastructure config routing bypasses
     peer = new Peer(`agames-share-${randomCode}`, peerConfig);
 
-    peer.on('call', (call) => {
-        // Automatically answer and send your local capture stream right back
-        call.answer(localStream); 
-        
-        call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-            setOnlineUI(); // Visual indicator badge turns green
+    // Explicitly listen for data track syncs as well as video calls to double-lock the connection state
+    peer.on('connection', (conn) => {
+        conn.on('open', () => {
+            // Once verified online, force check a secondary verification to request the video line if dropped
+            if(!remoteVideo.srcObject) {
+                peer.call(`agames-share-${randomCode}-client`, localStream);
+            }
         });
-        
-        call.on('close', () => {
-            remoteVideo.srcObject = null;
-            connIndicator.style.display = "none";
+    });
+
+    peer.on('call', (call) => {
+        call.answer(localStream); 
+        call.on('stream', (remoteStream) => {
+            handleRemoteStream(remoteStream);
         });
     });
 });
@@ -267,30 +268,33 @@ btnJoin.addEventListener('click', async () => {
     const success = await startCapture();
     if (!success) return;
 
-    // Initialize join node with Google infrastructure config routing bypasses
-    peer = new Peer(peerConfig);
-    statusText.innerText = "Status: Connecting via STUN router...";
+    // Use a predictable matching client namespace ID string to stabilize routing lanes
+    const clientNodeId = `agames-share-${code}-client`;
+    peer = new Peer(clientNodeId, peerConfig);
+    statusText.innerText = "Status: Syncing connection channels...";
     statusText.style.color = "#f59e0b";
 
     peer.on('open', () => {
-        const targetPeerId = `agames-share-${code}`;
-        const call = peer.call(targetPeerId, localStream);
+        const targetHostId = `agames-share-${code}`;
         
-        call.on('stream', (remoteStream) => {
-            remoteVideo.srcObject = remoteStream;
-            setOnlineUI(); // Visual indicator badge turns green
-        });
-
-        call.on('close', () => {
-            remoteVideo.srcObject = null;
-            connIndicator.style.display = "none";
+        // Open data pipeline first to wake up the host socket node
+        const dataConn = peer.connect(targetHostId);
+        
+        dataConn.on('open', () => {
+            // Instantly transmit the media capture call layer right behind it
+            const call = peer.call(targetHostId, localStream);
+            call.on('stream', (remoteStream) => {
+                handleRemoteStream(remoteStream);
+            });
         });
     });
 
-    peer.on('error', (err) => {
-        console.error(err);
-        statusText.innerText = "Status: Connection failed. Check room code.";
-        statusText.style.color = "#f43f5e";
+    // Intercept callback loops thrown back by the host stream manager threads
+    peer.on('call', (incomingCall) => {
+        incomingCall.answer(localStream);
+        incomingCall.on('stream', (remoteStream) => {
+            handleRemoteStream(remoteStream);
+        });
     });
 });
 </script>
