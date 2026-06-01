@@ -39,7 +39,7 @@ html, body {
   font-weight: 500;
 }
 
-/* NEON VISUAL BANNER BOX FOR GENERATED CODE */
+/* VISUAL BANNER BOX FOR GENERATED CODE */
 #code-box {
   display: none;
   background: #2e1065;
@@ -51,6 +51,27 @@ html, body {
   font-weight: 800;
   letter-spacing: 1px;
   box-shadow: 0 0 15px rgba(192, 132, 252, 0.4);
+}
+
+/* GLOWING CONNECTED INDICATOR BADGE */
+#conn-indicator {
+  display: none;
+  background: #064e3b;
+  border: 2px solid #34d399;
+  color: #a7f3d0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(52, 211, 153, 0.4);
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(0.98); }
 }
 
 #room-input {
@@ -126,6 +147,7 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
             <span style="font-weight: 800; color: #a855f7; letter-spacing: 0.5px; font-size: 18px;">AGAMES SHARE</span>
             <span id="status-text">Status: Ready to Stream</span>
             <div id="code-box">ROOM CODE: <span id="generated-code-text">0000</span></div>
+            <div id="conn-indicator">● Live Connected</div>
         </div>
         <div class="menu-group" id="interactive-actions">
             <button id="btn-host">Host Live Screen</button>
@@ -156,11 +178,22 @@ const remoteVideo = document.getElementById('remote-video');
 const codeBox = document.getElementById('code-box');
 const generatedCodeText = document.getElementById('generated-code-text');
 const orSeparator = document.getElementById('or-separator');
+const connIndicator = document.getElementById('conn-indicator');
 
 let peer = null;
 let localStream = null;
 
-// Requests permission to capture display panels
+// Clean function to update UI layout when connection goes fully online
+function setOnlineUI() {
+    connIndicator.style.display = "block";
+    statusText.style.display = "none";
+    btnHost.style.display = "none";
+    btnJoin.style.display = "none";
+    roomInput.style.display = "none";
+    orSeparator.style.display = "none";
+}
+
+// Request permission to capture browser display panels
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -181,42 +214,34 @@ btnHost.addEventListener('click', async () => {
     statusText.innerText = "Status: Awaiting screen confirmation popup...";
     statusText.style.color = "#f59e0b";
 
-    // 1. Prompt screen sharing first
     const success = await startCapture();
     if (!success) return; 
 
-    // 2. Generate code immediately when streaming works
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // UI Cleanup updates
+    // Setup hosting visuals
     btnHost.style.display = "none";
     btnJoin.style.display = "none";
     roomInput.style.display = "none";
     orSeparator.style.display = "none";
     statusText.style.display = "none";
-
     generatedCodeText.innerText = randomCode;
     codeBox.style.display = "block";
 
-    // 3. Initialize host cloud connection listeners
     peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
 
-    peer.on('error', (err) => {
-        console.error(err);
-        alert("P2P Signaling Error. Please try hosting again.");
-    });
-
-    // FIX: Catch your friend's outbound call stream and display it
+    // Catch incoming connections and link video tracks up immediately
     peer.on('call', (call) => {
-        // Answer by passing back your own stream to make it a two-way exchange
         call.answer(localStream); 
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
+            setOnlineUI(); // Trigger neon green connected badge
         });
         
         call.on('close', () => {
             remoteVideo.srcObject = null;
+            connIndicator.style.display = "none";
         });
     });
 });
@@ -229,11 +254,9 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
-    // 1. Capture the joining player's display media first
     const success = await startCapture();
     if (!success) return;
 
-    // 2. Setup standard client node configurations
     peer = new Peer({ debug: 1 });
     statusText.innerText = "Status: Connecting to room code...";
     statusText.style.color = "#f59e0b";
@@ -241,26 +264,32 @@ btnJoin.addEventListener('click', async () => {
     peer.on('open', () => {
         const targetPeerId = `agames-share-${code}`;
         
-        // 3. Transmit your stream over to the target host
+        // Fire out transmission call parameter structure
         const call = peer.call(targetPeerId, localStream);
         
-        // FIX: Capture and render the incoming stream sent back by the host
         call.on('stream', (remoteStream) => {
-            statusText.innerText = "Status: Streams Connected!";
-            statusText.style.color = "#10b981";
             remoteVideo.srcObject = remoteStream;
+            setOnlineUI(); // Trigger neon green connected badge on join side too
         });
 
         call.on('close', () => {
             remoteVideo.srcObject = null;
-            statusText.innerText = "Status: Disconnected.";
-            statusText.style.color = "#f43f5e";
+            connIndicator.style.display = "none";
+        });
+    });
+
+    // Handle incoming stream backup calls if the host re-signals a media line link
+    peer.on('call', (incomingCall) => {
+        incomingCall.answer(localStream);
+        incomingCall.on('stream', (remoteStream) => {
+            remoteVideo.srcObject = remoteStream;
+            setOnlineUI();
         });
     });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "Status: Match failed. Check code or host status.";
+        statusText.innerText = "Status: Connection failed. Verify host room code.";
         statusText.style.color = "#f43f5e";
     });
 });
