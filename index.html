@@ -21,9 +21,9 @@ html, body {
 
 /* TOP DASHBOARD CONTROL MENU */
 #control-menu {
-  height: 70px;
+  height: 80px;
   background: #18181b;
-  border-bottom: 2px solid #a855f7;
+  border-bottom: 3px solid #a855f7;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -34,9 +34,23 @@ html, body {
 .menu-group { display: flex; align-items: center; gap: 15px; }
 
 #status-text {
-  font-size: 14px;
+  font-size: 15px;
   color: #a1a1aa;
   font-weight: 500;
+}
+
+/* NEON VISUAL BANNER BOX FOR GENERATED CODE */
+#code-box {
+  display: none;
+  background: #2e1065;
+  border: 2px solid #c084fc;
+  color: #f3e8ff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(192, 132, 252, 0.4);
 }
 
 #room-input {
@@ -55,7 +69,7 @@ button {
   background: #a855f7;
   color: white;
   border: none;
-  padding: 9px 18px;
+  padding: 10px 20px;
   border-radius: 6px;
   cursor: pointer;
   font-weight: bold;
@@ -69,7 +83,7 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
 #video-grid {
   display: flex;
   width: 100%;
-  height: calc(100% - 70px);
+  height: calc(100% - 80px);
   background: #09090b;
 }
 
@@ -109,10 +123,11 @@ button:disabled { background: #3f3f46; color: #a1a1aa; cursor: not-allowed; }
 
     <div id="control-menu">
         <div class="menu-group">
-            <span style="font-weight: 800; color: #a855f7; letter-spacing: 0.5px;">AGAMES SHARE</span>
-            <span id="status-text">Status: Offline</span>
+            <span style="font-weight: 800; color: #a855f7; letter-spacing: 0.5px; font-size: 18px;">AGAMES SHARE</span>
+            <span id="status-text">Status: Ready to Stream</span>
+            <div id="code-box">ROOM CODE: <span id="generated-code-text">0000</span></div>
         </div>
-        <div class="menu-group">
+        <div class="menu-group" id="interactive-actions">
             <button id="btn-host">Host Live Screen</button>
             <span style="color: #71717a;" id="or-separator">or</span>
             <input type="text" id="room-input" placeholder="Enter Friend's Code" maxlength="4">
@@ -138,11 +153,14 @@ const btnJoin = document.getElementById('btn-join');
 const statusText = document.getElementById('status-text');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
+const codeBox = document.getElementById('code-box');
+const generatedCodeText = document.getElementById('generated-code-text');
+const orSeparator = document.getElementById('or-separator');
 
 let peer = null;
 let localStream = null;
 
-// Prompts browser system screen frame tracking
+// Requests permission to capture local display frames
 async function startCapture() {
     try {
         localStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -152,7 +170,7 @@ async function startCapture() {
         localVideo.srcObject = localStream;
         return true;
     } catch (err) {
-        statusText.innerText = "Error: Permission denied.";
+        statusText.innerText = "Status: Screen capture permission denied.";
         statusText.style.color = "#f43f5e";
         return false;
     }
@@ -160,44 +178,37 @@ async function startCapture() {
 
 // HOST CONNECTION LOGIC
 btnHost.addEventListener('click', async () => {
-    // Generate code IMMEDIATELY in the browser layout before touching the server ports
+    statusText.innerText = "Status: Awaiting screen confirmation popup...";
+    statusText.style.color = "#f59e0b";
+
+    // 1. Run the screen capture tool FIRST
+    const success = await startCapture();
+    if (!success) return; // Halt if user drops permission window
+
+    // 2. The moment it starts sharing successfully, generate the code
     const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
     
-    // Clear display menus and output your 4 digit random code
-    btnHost.disabled = true;
-    btnJoin.disabled = true;
+    // Hide standard buttons to clean up menu workspace
+    btnHost.style.display = "none";
+    btnJoin.style.display = "none";
     roomInput.style.display = "none";
-    document.getElementById('or-separator').style.display = "none";
-    statusText.innerText = `YOUR ROOM CODE: ${randomCode} (Give this to your friend)`;
-    statusText.style.color = "#10b981";
+    orSeparator.style.display = "none";
+    statusText.style.display = "none";
 
-    // Request screen share after displaying code layout
-    const success = await startCapture();
-    if (!success) {
-        // Reset display buttons if screen capture failed
-        btnHost.disabled = false;
-        btnJoin.disabled = false;
-        roomInput.style.display = "inline-block";
-        document.getElementById('or-separator').style.display = "inline";
-        statusText.innerText = "Status: Offline";
-        statusText.style.color = "#a1a1aa";
-        return;
-    }
-    
-    // Connect backend peer connection stream nodes onto matching namespaces
+    // Show code inside the dedicated purple banner container box
+    generatedCodeText.innerText = randomCode;
+    codeBox.style.display = "block";
+
+    // 3. Fire up backend server communication pipeline engine
     peer = new Peer(`agames-share-${randomCode}`, { debug: 1 });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "Network Delay Notice: Re-attempting signaling channel lock...";
-        statusText.style.color = "#f59e0b";
     });
 
-    // Wait and accept incoming stream handshakes from join box actions
+    // Wait and intercept inbound visual calls from join inputs
     peer.on('call', (call) => {
-        statusText.innerText = "Friend Connected! Sharing live video frames.";
-        statusText.style.color = "#a855f7";
-        call.answer(localStream); 
+        call.answer(localStream); // Send your video capture feed back outwards
         
         call.on('stream', (remoteStream) => {
             remoteVideo.srcObject = remoteStream;
@@ -205,8 +216,6 @@ btnHost.addEventListener('click', async () => {
         
         call.on('close', () => {
             remoteVideo.srcObject = null;
-            statusText.innerText = "Friend left stream session.";
-            statusText.style.color = "#f43f5e";
         });
     });
 });
@@ -223,7 +232,7 @@ btnJoin.addEventListener('click', async () => {
     if (!success) return;
 
     peer = new Peer({ debug: 1 });
-    statusText.innerText = "Connecting to friend's game room...";
+    statusText.innerText = "Status: Connecting to room code...";
     statusText.style.color = "#f59e0b";
 
     peer.on('open', () => {
@@ -231,21 +240,21 @@ btnJoin.addEventListener('click', async () => {
         const call = peer.call(targetPeerId, localStream);
         
         call.on('stream', (remoteStream) => {
-            statusText.innerText = "Connected successfully! Active synchronization active.";
+            statusText.innerText = "Status: Streams Connected!";
             statusText.style.color = "#10b981";
             remoteVideo.srcObject = remoteStream;
         });
 
         call.on('close', () => {
             remoteVideo.srcObject = null;
-            statusText.innerText = "Disconnected from room.";
+            statusText.innerText = "Status: Disconnected.";
             statusText.style.color = "#f43f5e";
         });
     });
 
     peer.on('error', (err) => {
         console.error(err);
-        statusText.innerText = "Match failed. Wrong room code or host closed down.";
+        statusText.innerText = "Status: Match failed. Check code or host status.";
         statusText.style.color = "#f43f5e";
     });
 });
