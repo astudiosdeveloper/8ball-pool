@@ -3,490 +3,185 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGames Share</title>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<title>AGames Share (LAN Edition)</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  html, body {
-    width: 100%; height: 100%; overflow: hidden;
-    background: #09090b;
+  body {
+    background: #09090b; color: white;
     font-family: system-ui, -apple-system, sans-serif;
-    color: white;
+    padding: 20px; display: flex; flex-direction: column; gap: 20px; height: 100vh;
   }
-
-  #app { display: flex; flex-direction: column; width: 100%; height: 100%; }
-
-  #control-bar {
-    height: 72px; flex-shrink: 0;
-    background: #111113;
-    border-bottom: 2px solid #7c3aed;
-    display: flex; align-items: center;
-    justify-content: space-between;
-    padding: 0 24px; gap: 16px;
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #7c3aed; padding-bottom: 10px; }
+  .grid { display: flex; gap: 20px; flex: 1; min-height: 0; }
+  .panel { flex: 1; background: #111113; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+  textarea {
+    flex: 1; background: #1c1c1f; border: 1px solid #3f3f46; color: #a7f3d0;
+    padding: 10px; border-radius: 6px; resize: none; font-family: monospace; font-size: 11px; outline: none;
   }
-  #bar-left  { display: flex; align-items: center; gap: 18px; min-width: 0; }
-  #bar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-
-  .brand { font-size: 17px; font-weight: 800; color: #a855f7; letter-spacing: 1px; white-space: nowrap; }
-
-  #status {
-    font-size: 14px; font-weight: 500; color: #a1a1aa;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  textarea:focus { border-color: #7c3aed; }
+  button {
+    background: #7c3aed; color: white; border: none; padding: 10px;
+    border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.1s;
   }
-
-  #code-display { display: none; align-items: center; gap: 10px; }
-  #code-display.visible { display: flex; }
-  .code-label { font-size: 13px; color: #a1a1aa; }
-  #code-value {
-    font-size: 22px; font-weight: 900; color: #a855f7;
-    letter-spacing: 6px; font-variant-numeric: tabular-nums;
-  }
-  #copy-btn {
-    background: #27272a; border: 1px solid #a855f7; color: #a855f7;
-    padding: 4px 12px; border-radius: 6px; cursor: pointer;
-    font-size: 12px; font-weight: 600; transition: background 0.15s;
-  }
-  #copy-btn:hover { background: #3f1d6e; }
-
-  .sep { color: #52525b; font-size: 13px; }
-
-  #room-input {
-    background: #1c1c1f; border: 1px solid #a855f7; color: white;
-    padding: 8px 14px; border-radius: 8px; font-size: 15px;
-    width: 150px; text-align: center; outline: none;
-    font-weight: 600; letter-spacing: 4px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  #room-input::placeholder { color: #52525b; letter-spacing: 0; font-weight: 400; font-size: 13px; }
-  #room-input:focus { border-color: #c084fc; box-shadow: 0 0 0 3px rgba(168,85,247,.15); }
-
-  .action-btn {
-    background: #7c3aed; color: white; border: none;
-    padding: 9px 20px; border-radius: 8px; cursor: pointer;
-    font-weight: 700; font-size: 14px; white-space: nowrap;
-    transition: background 0.15s, transform 0.1s;
-  }
-  .action-btn:hover { background: #6d28d9; }
-  .action-btn:active { transform: scale(.97); }
-  .action-btn:disabled { background: #3f3f3f; color: #71717a; cursor: not-allowed; }
-
-  #chat-toggle {
-    position: relative;
-    background: #27272a; border: 1px solid #3f3f46;
-    color: white; padding: 7px 14px; border-radius: 8px;
-    cursor: pointer; font-size: 16px; line-height: 1;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  #chat-toggle:hover { background: #3f3f46; }
-  #chat-toggle.active { background: #3b0764; border-color: #a855f7; }
-  #unread-badge {
-    display: none;
-    position: absolute; top: -6px; right: -6px;
-    background: #ef4444; color: white;
-    font-size: 10px; font-weight: 800;
-    border-radius: 99px; min-width: 18px; height: 18px;
-    padding: 0 4px; align-items: center; justify-content: center;
-  }
-  #unread-badge.visible { display: flex; }
-
-  #main-area { flex: 1; display: flex; overflow: hidden; }
-  #video-grid { flex: 1; display: flex; overflow: hidden; }
-
-  .video-panel { flex: 1; position: relative; background: #0a0a0b; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .video-panel video { width: 100%; height: 100%; object-fit: contain; background: black; }
-  .divider { width: 3px; background: #27272a; flex-shrink: 0; }
-
-  .video-badge {
-    position: absolute; top: 14px; left: 14px;
-    padding: 5px 12px; border-radius: 6px;
-    font-size: 12px; font-weight: 700;
-    pointer-events: none; backdrop-filter: blur(6px); z-index: 10;
-  }
-  .badge-you { background: rgba(9,9,11,.8);   border-left: 3px solid #a855f7; color: #d8b4fe; }
-  .badge-on  { background: rgba(6,50,35,.85); border-left: 3px solid #34d399; color: #a7f3d0; }
-  .badge-off { background: rgba(40,10,10,.8); border-left: 3px solid #ef4444; color: #fca5a5; }
-
-  .placeholder {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 12px; color: #3f3f46; pointer-events: none;
-  }
-  .placeholder .icon { font-size: 48px; filter: grayscale(1) brightness(.4); }
-  .placeholder p { font-size: 14px; font-weight: 500; }
-
-  #chat-sidebar {
-    width: 0; flex-shrink: 0; overflow: hidden;
-    background: #111113; border-left: 2px solid #27272a;
-    display: flex; flex-direction: column;
-    transition: width 0.25s ease;
-  }
-  #chat-sidebar.open { width: 300px; }
-
-  #chat-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid #27272a;
-    display: flex; align-items: center; justify-content: space-between;
-    font-weight: 700; font-size: 14px; color: #a855f7; flex-shrink: 0;
-  }
-  #chat-close {
-    background: none; border: none; color: #71717a;
-    cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px;
-    transition: color 0.15s;
-  }
-  #chat-close:hover { color: white; }
-
-  #chat-messages {
-    flex: 1; overflow-y: auto; padding: 12px;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  #chat-messages::-webkit-scrollbar { width: 4px; }
-  #chat-messages::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
-
-  #chat-empty {
-    color: #52525b; font-size: 13px; text-align: center;
-    margin: auto; padding: 20px; line-height: 1.5;
-  }
-
-  .bubble { display: flex; flex-direction: column; gap: 2px; max-width: 90%; }
-  .bubble-me   { align-self: flex-end;   align-items: flex-end; }
-  .bubble-them { align-self: flex-start; align-items: flex-start; }
-  .bubble-label { font-size: 10px; font-weight: 700; color: #71717a; padding: 0 4px; }
-  .bubble-text {
-    padding: 8px 12px; border-radius: 12px;
-    font-size: 13px; line-height: 1.4; word-break: break-word;
-  }
-  .bubble-me   .bubble-text { background: #6d28d9; color: white; border-bottom-right-radius: 3px; }
-  .bubble-them .bubble-text { background: #27272a; color: #e4e4e7; border-bottom-left-radius: 3px; }
-
-  #chat-input-row {
-    display: flex; gap: 8px; padding: 12px;
-    border-top: 1px solid #27272a; flex-shrink: 0;
-  }
-  #chat-input {
-    flex: 1; background: #1c1c1f; border: 1px solid #3f3f46;
-    color: white; padding: 8px 12px; border-radius: 8px;
-    font-size: 13px; outline: none; transition: border-color 0.15s;
-  }
-  #chat-input:focus { border-color: #a855f7; }
-  #chat-input:disabled { opacity: .45; cursor: not-allowed; }
-  #chat-input::placeholder { color: #52525b; }
-  #send-btn {
-    background: #7c3aed; border: none; color: white;
-    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 15px;
-    transition: background 0.15s;
-  }
-  #send-btn:hover:not(:disabled) { background: #6d28d9; }
-  #send-btn:disabled { background: #3f3f46; color: #71717a; cursor: not-allowed; }
+  button:hover { background: #6d28d9; }
+  .video-container { flex: 2; display: flex; flex-direction: column; gap: 10px; }
+  video { width: 100%; flex: 1; background: black; border-radius: 8px; object-fit: contain; }
+  .status { font-weight: bold; color: #a1a1aa; }
 </style>
 </head>
 <body>
-<div id="app">
 
-  <div id="control-bar">
-    <div id="bar-left">
-      <span class="brand">AGAMES SHARE</span>
-      <div id="code-display">
-        <span class="code-label">Your room code:</span>
-        <span id="code-value"></span>
-        <button id="copy-btn">Copy</button>
-      </div>
-      <span id="status">Status: Waiting for action...</span>
-    </div>
-    <div id="bar-right">
-      <div id="join-controls">
-        <button class="action-btn" id="btn-host">Host Live Screen</button>
-        <span class="sep">or</span>
-        <input id="room-input" type="text" placeholder="Enter Room Code" maxlength="4">
-        <button class="action-btn" id="btn-join">Join Stream</button>
-      </div>
-      <button id="chat-toggle" title="Toggle chat">
-        💬
-        <span id="unread-badge"></span>
-      </button>
-    </div>
-  </div>
-
-  <div id="main-area">
-    <div id="video-grid">
-      <div class="video-panel">
-        <video id="local-video" autoplay playsinline muted></video>
-        <div class="video-badge badge-you">Your Screen</div>
-        <div class="placeholder" id="local-placeholder">
-          <div class="icon">🖥</div>
-          <p>Your screen will appear here</p>
-        </div>
-      </div>
-      <div class="divider"></div>
-      <div class="video-panel">
-        <video id="remote-video" autoplay playsinline></video>
-        <div class="video-badge badge-off" id="opponent-badge">● Opponent: Offline</div>
-        <div class="placeholder" id="remote-placeholder">
-          <div class="icon">👤</div>
-          <p>Opponent's screen will appear here</p>
-        </div>
-      </div>
-    </div>
-
-    <div id="chat-sidebar">
-      <div id="chat-header">
-        <span>Chat</span>
-        <button id="chat-close">✕</button>
-      </div>
-      <div id="chat-messages">
-        <div id="chat-empty">Chat is available once your opponent connects.</div>
-      </div>
-      <div id="chat-input-row">
-        <input id="chat-input" type="text" placeholder="Waiting for opponent..." disabled>
-        <button id="send-btn" disabled>➤</button>
-      </div>
-    </div>
-  </div>
-
+<div class="header">
+  <h2>AGAMES SHARE <span style="font-size:12px; color:#a1a1aa;">(School Network Serverless Mode)</span></h2>
+  <div class="status" id="status">Status: Waiting for initialization...</div>
 </div>
+
+<div class="grid">
+  <div class="panel" id="setup-panel">
+    <h3>Step 1: Choose Role</h3>
+    <div style="display:flex; gap:10px;">
+      <button style="flex:1;" id="btn-init-host">I am Hosting</button>
+      <button style="flex:1; background:#27272a;" id="btn-init-join">I am Joining</button>
+    </div>
+    
+    <h3 style="margin-top:10px;">Step 2: Share Connection Key</h3>
+    <p style="font-size:12px; color:#a1a1aa;">Copy the generated key below and send it to your opponent via shared doc/chat. Paste theirs back here.</p>
+    
+    <textarea id="sdp-box" placeholder="Generated keys will appear here... Paste your friend's key here when instructed."></textarea>
+    <button id="btn-action" disabled>Process Key</button>
+  </div>
+
+  <div class="video-container">
+    <div style="display:flex; gap:10px; flex: 1;">
+      <div style="flex:1; position:relative;">
+        <video id="local-video" autoplay playsinline muted></video>
+        <span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:12px;">Your Screen</span>
+      </div>
+      <div style="flex:1; position:relative;">
+        <video id="remote-video" autoplay playsinline></video>
+        <span style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:12px;">Opponent Screen</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-const statusEl      = document.getElementById('status');
-const codeDisplay   = document.getElementById('code-display');
-const codeValue     = document.getElementById('code-value');
-const copyBtn       = document.getElementById('copy-btn');
-const joinControls  = document.getElementById('join-controls');
-const btnHost       = document.getElementById('btn-host');
-const btnJoin       = document.getElementById('btn-join');
-const roomInput     = document.getElementById('room-input');
-const localVideo    = document.getElementById('local-video');
-const remoteVideo   = document.getElementById('remote-video');
-const localPH       = document.getElementById('local-placeholder');
-const remotePH      = document.getElementById('remote-placeholder');
-const opponentBadge = document.getElementById('opponent-badge');
-const chatToggle    = document.getElementById('chat-toggle');
-const chatSidebar   = document.getElementById('chat-sidebar');
-const chatClose     = document.getElementById('chat-close');
-const chatMessages  = document.getElementById('chat-messages');
-const chatEmptyEl   = document.getElementById('chat-empty');
-const chatInput     = document.getElementById('chat-input');
-const sendBtn       = document.getElementById('send-btn');
-const unreadBadge   = document.getElementById('unread-badge');
+const statusEl = document.getElementById('status');
+const sdpBox = document.getElementById('sdp-box');
+const btnAction = document.getElementById('btn-action');
+const btnInitHost = document.getElementById('btn-init-host');
+const btnInitJoin = document.getElementById('btn-init-join');
+const localVideo = document.getElementById('local-video');
+const remoteVideo = document.getElementById('remote-video');
 
-let peer        = null;
+let pc = null;
 let localStream = null;
-let dataConn    = null;
-let unreadCount = 0;
-let chatIsOpen  = false;
+let role = null; // 'host' or 'joiner'
 
-// Configured using dedicated Secure TCP parameters to push video data over universal Web Port 443
-const ICE = {
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      {
-        urls: 'turn:global.metered.ca:443?transport=tcp',
-        username: '60ca5cf74571687d03694244',
-        credential: 'K76i1CIat+H1N+pA'
-      },
-      {
-        urls: 'turn:global.metered.ca:80?transport=tcp',
-        username: '60ca5cf74571687d03694244',
-        credential: 'K76i1CIat+H1N+pA'
-      }
-    ],
-    sdpSemantics: 'unified-plan'
-  }
+const rtcConfig = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Standard public utility STUN
 };
 
-function setStatus(text, color) {
-  statusEl.textContent = text;
-  statusEl.style.color = color || '#a1a1aa';
-}
-
-function hideJoinControls() { joinControls.style.display = 'none'; }
-
-function showCode(code) {
-  statusEl.style.display = 'none';
-  codeDisplay.classList.add('visible');
-  codeValue.textContent = code;
-}
-
-function setOpponentOnline() {
-  opponentBadge.textContent = '● Opponent: Online';
-  opponentBadge.className   = 'video-badge badge-on';
-  remotePH.style.display    = 'none';
-}
-
+// Start Screen Capture
 async function startCapture() {
   try {
     localStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
     localVideo.srcObject = localStream;
-    localPH.style.display = 'none';
     return true;
   } catch (err) {
-    console.error(err);
-    setStatus('Status: Screen capture permission denied.', '#f43f5e');
+    statusEl.textContent = "Status: Screen permission denied.";
+    statusEl.style.color = "#ef4444";
     return false;
   }
 }
 
-function enableChat() {
-  chatInput.disabled    = false;
-  sendBtn.disabled      = false;
-  chatInput.placeholder = 'Type a message...';
-  if (chatEmptyEl && chatEmptyEl.parentNode === chatMessages)
-    chatMessages.removeChild(chatEmptyEl);
-}
-
-function appendMessage(from, text) {
-  if (chatEmptyEl && chatEmptyEl.parentNode === chatMessages)
-    chatMessages.removeChild(chatEmptyEl);
-
-  const wrap   = document.createElement('div');
-  wrap.className = 'bubble bubble-' + from;
-  const label  = document.createElement('span');
-  label.className = 'bubble-label';
-  label.textContent = from === 'me' ? 'You' : 'Opponent';
-  const bubble = document.createElement('span');
-  bubble.className = 'bubble-text';
-  bubble.textContent = text;
-  wrap.appendChild(label);
-  wrap.appendChild(bubble);
-  chatMessages.appendChild(wrap);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  if (!chatIsOpen && from === 'them') {
-    unreadCount++;
-    unreadBadge.textContent = unreadCount;
-    unreadBadge.classList.add('visible');
+// Prepare WebRTC Peer Connection Instance
+function createPeerConnection() {
+  pc = new RTCPeerConnection(rtcConfig);
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
   }
+
+  pc.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+      statusEl.textContent = "Status: Connected!";
+      statusEl.style.color = "#10b981";
+    }
+  };
+
+  // ICE Candidates will compile directly into the Local SDP block
+  pc.onicecandidate = (e) => {
+    if (e.candidate == null) {
+      sdpBox.value = btoa(JSON.stringify(pc.localDescription));
+      statusEl.textContent = "Status: Key Ready! Copy it and send it to your friend.";
+      statusEl.style.color = "#34d399";
+      sdpBox.select();
+    }
+  };
 }
 
-function wireDataConn(conn) {
-  dataConn = conn;
-  conn.on('data', (raw) => appendMessage('them', String(raw)));
-  conn.on('open', enableChat);
-  if (conn.open) enableChat();
-}
+// Clicked Host
+btnInitHost.addEventListener('click', async () => {
+  if (!await startCapture()) return;
+  role = 'host';
+  btnInitHost.disabled = true;
+  btnInitJoin.disabled = true;
+  btnAction.disabled = false;
+  btnAction.textContent = "Accept Joiner Key";
+  statusEl.textContent = "Status: Generating Host Key...";
 
-function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text || !dataConn) return;
-  dataConn.send(text);
-  appendMessage('me', text);
-  chatInput.value = '';
-}
+  createPeerConnection();
+  
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+});
 
-chatToggle.addEventListener('click', () => {
-  chatIsOpen = !chatIsOpen;
-  chatSidebar.classList.toggle('open', chatIsOpen);
-  chatToggle.classList.toggle('active', chatIsOpen);
-  if (chatIsOpen) {
-    unreadCount = 0;
-    unreadBadge.textContent = '';
-    unreadBadge.classList.remove('visible');
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+// Clicked Joiner
+btnInitJoin.addEventListener('click', async () => {
+  if (!await startCapture()) return;
+  role = 'joiner';
+  btnInitHost.disabled = true;
+  btnInitJoin.disabled = true;
+  btnAction.disabled = false;
+  btnAction.textContent = "Generate Joiner Answer Key";
+  sdpBox.placeholder = "PASTE Host Key Here First, then press the button below...";
+  statusEl.textContent = "Status: Paste Host Key to begin.";
+});
+
+// Process Button
+btnAction.addEventListener('click', async () => {
+  const inputData = sdpBox.value.trim();
+  if (!inputData) { alert("Please input or paste a connection key first."); return; }
+
+  try {
+    const parsedSDP = JSON.parse(atob(inputData));
+
+    if (role === 'host') {
+      // Host receives the Answer key back from the Joiner
+      await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
+      statusEl.textContent = "Status: Finalizing connection tunnel...";
+    } 
+    else if (role === 'joiner') {
+      if (!pc) {
+        // Joiner processes Host's Offer key first
+        createPeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(parsedSDP));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        statusEl.textContent = "Status: Generating Answer Key...";
+        btnAction.textContent = "Connect Stream";
+      } else {
+        // If joiner already has an answer ready, prompt them to send it
+        alert("Copy the new key in the box and send it back to the Host!");
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Invalid connection key data. Please try copying the full text block again.");
   }
 });
-chatClose.addEventListener('click', () => {
-  chatIsOpen = false;
-  chatSidebar.classList.remove('open');
-  chatToggle.classList.remove('active');
-});
-sendBtn.addEventListener('click', sendMessage);
-chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
-copyBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(codeValue.textContent);
-  copyBtn.textContent = 'Copied!';
-  setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-});
-
-// HOST
-btnHost.addEventListener('click', async () => {
-  setStatus('Status: Awaiting screen confirmation...', '#f59e0b');
-  if (!await startCapture()) return;
-
-  const code = Math.floor(1000 + Math.random() * 9000).toString();
-  hideJoinControls();
-  showCode(code);
-
-  // SCHOOL BYPASS: Forces matchmaking over explicit secure port 443 on public cloud host
-  peer = new Peer('agames-netshare-' + code, {
-    host: 'peerjs.com',
-    port: 443,
-    secure: true,
-    config: ICE.config,
-    debug: 1
-  });
-
-  peer.on('error', (err) => {
-    console.error('Host error:', err);
-    setStatus(`Error: ${err.type}`, '#f43f5e');
-  });
-
-  peer.on('call', (call) => {
-    call.answer(localStream);
-    call.on('stream', (s) => {
-      remoteVideo.srcObject = s;
-      setOpponentOnline();
-      setStatus('Status: Connected!', '#10b981');
-    });
-  });
-
-  peer.on('connection', (conn) => {
-    wireDataConn(conn);
-    conn.on('open', () => {
-      setTimeout(() => {
-        if (!remoteVideo.srcObject) {
-          const fb = peer.call('agames-netshare-' + code + '-client', localStream);
-          fb.on('stream', (s) => {
-            remoteVideo.srcObject = s;
-            setOpponentOnline();
-            setStatus('Status: Connected!', '#10b981');
-          });
-        }
-      }, 500);
-    });
-  });
-});
-
-// JOIN
-btnJoin.addEventListener('click', async () => {
-  const code = roomInput.value.trim();
-  if (code.length !== 4 || isNaN(code)) { alert('Please enter a valid 4-digit room code.'); return; }
-  if (!await startCapture()) return;
-
-  hideJoinControls();
-  setStatus('Status: Tunneling through firewall over TCP...', '#f59e0b');
-
-  // SCHOOL BYPASS: Forces matchmaking over explicit secure port 443 on public cloud host
-  peer = new Peer('agames-netshare-' + code + '-client', {
-    host: 'peerjs.com',
-    port: 443,
-    secure: true,
-    config: ICE.config,
-    debug: 1
-  });
-
-  peer.on('error', (err) => {
-    console.error('Join error:', err);
-    setStatus(`Error: ${err.type}`, '#f43f5e');
-  });
-
-  peer.on('open', () => {
-    const tid = 'agames-netshare-' + code;
-    const dc  = peer.connect(tid, { reliable: true });
-    wireDataConn(dc);
-  });
-
-  peer.on('call', (incoming) => {
-    incoming.answer(localStream);
-    incoming.on('stream', (s) => {
-      remoteVideo.srcObject = s;
-      setOpponentOnline();
-      setStatus('Status: Connected!', '#10b981');
-    });
-  });
-});
-
-roomInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnJoin.click(); });
 </script>
 </body>
 </html>
